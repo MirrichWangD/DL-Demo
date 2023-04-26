@@ -504,10 +504,9 @@ if __name__ == "__main__":
                 LOSS["train"][epoch].append(loss.item())
                 ACC["train"][epoch].append(correct["train"] / total["train"])
                 # 更新进度条
-                pbar_dict = {"loss": f"{LOSS['train'][epoch][-1]:.4f}",
-                             "acc": f"{ACC['train'][epoch][-1] * 100:.2f}%"}
                 pbar.update(1)
-                pbar.set_postfix(pbar_dict)
+                pbar.set_postfix({"loss": f"{np.mean(LOSS['train'][epoch]):.4f}",
+                                  "acc": f"{np.mean(ACC['train'][epoch]) * 100:.2f}%"})
 
             # 训练完一个 epoch 后进行验证
             model.eval()
@@ -534,9 +533,10 @@ if __name__ == "__main__":
                 LOSS["val"][epoch].append(loss.item())
                 ACC["val"][epoch].append(correct["val"] / total["val"])
                 # 更新进度条
-                pbar_dict.update({"loss_val": f"{LOSS['val'][epoch][-1]:.4f}",
-                                  "acc_val": f"{ACC['val'][epoch][-1] * 100:.2f}%"})
-                pbar.set_postfix(pbar_dict)
+                pbar.set_postfix({"loss": f"{np.mean(LOSS['train'][epoch]):.4f}",
+                                  "acc": f"{np.mean(ACC['train'][epoch]) * 100:.2f}%",
+                                  "loss_val": f"{np.mean(LOSS['val'][epoch]):.4f}",
+                                  "acc_val": f"{np.mean(ACC['val'][epoch]) * 100:.2f}%"})
 
             # 判断验证数据平均准确率是否大于最优准确率，若更高则保存 best_model.pth
             if np.mean(ACC["val"][epoch]).item() > BEST_ACC:
