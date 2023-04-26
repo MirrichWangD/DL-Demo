@@ -115,7 +115,7 @@ def get_args_parser():
     parser.add_argument("--batch_size", default=64, type=int, help="批数量")
     parser.add_argument("--n_workers", default=0, type=int, help="读取数据进程数，在IDE运行时请设置为0")
     parser.add_argument("--device", default="cuda:0", type=str, help="运算设备")
-    parser.add_argument("--output", default="output/cmn-eng", type=str, help="训练结果保存路径")
+    parser.add_argument("--output", default="output/eng-zh", type=str, help="训练结果保存路径")
 
     return parser
 
