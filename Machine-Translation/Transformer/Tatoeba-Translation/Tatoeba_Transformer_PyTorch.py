@@ -73,7 +73,7 @@ LANGUAGE = {}
 # 定义特殊TOKEN
 PAD_IDX, UNK_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
 SPECIALS = ["<pad>", "<unk>", "<bos>", "<eos>"]
-# 定义 spacy 语言模型库，用于分词
+# 定义 spacy 语言模型库，用于分词，该部分可以自行增加
 # 注意！运行时请确保输入的 src_lang 和 tgt_lang 能够在此查询到相对应的 Spacy 语言模块，否则会构造数据集时报错
 SPACY = {
     "de": "de_core_news_sm",
