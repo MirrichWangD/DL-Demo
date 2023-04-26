@@ -88,7 +88,7 @@ def get_args_parser():
     parser.add_argument("--d_model", default=512, type=int, help="嵌入层维数")
     parser.add_argument("--d_ff", default=2048, type=int, help="前馈网络维数")
     parser.add_argument("--dropout", default=.1, type=float, help="Dropout比例")
-    parser.add_argument("--resume", default="output/eng-zh/best_model.pth", type=str, help="导入模型权重路径")
+    parser.add_argument("--resume", default=None, type=str, help="导入模型权重路径")
 
     # 训练参数
     parser.add_argument("--epochs", default=100, type=int, help="训练轮数")
