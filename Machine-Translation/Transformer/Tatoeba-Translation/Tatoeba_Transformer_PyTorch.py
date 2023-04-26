@@ -431,6 +431,11 @@ if __name__ == "__main__":
     # 构建数据集
     dataset = TranslationDataset(file_path=args.data_dir, src_lang=args.src_lang, tgt_lang=args.tgt_lang)
     print(dataset)
+    # 保存 vocab
+    with open(output_dir / "src_dict.txt", "w+", encoding="utf-8") as f:
+        f.writelines(map(lambda i: i + "\n", dataset.src_vocab.get_itos()))
+    with open(output_dir / "tgt_dict.txt", "w+", encoding="utf-8") as f:
+        f.writelines(map(lambda i: i + "\n", dataset.tgt_vocab.get_itos()))
 
     # 划分训练、验证、测试集，分批
     indices = np.arange(len(dataset))
@@ -561,22 +566,23 @@ if __name__ == "__main__":
     val_loss = np.mean(LOSS["val"], axis=1)
     val_acc = np.mean(ACC["val"], axis=1)
 
+    # 绘制损失图
     plt.figure()
     plt.plot(train_loss, label="Train")
     plt.plot(val_loss, label="Val")
-    plt.xticks(range(args.epochs), labels=range(1, args.epochs + 1))
     plt.legend(loc="best")
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
+    plt.tight_layout()
     plt.savefig(output_dir / "loss.png")
-
+    # 绘制精准率图
     plt.figure()
     plt.plot(train_acc, label="Train")
     plt.plot(val_acc, label="Val")
-    plt.xticks(range(args.epochs), labels=range(1, args.epochs + 1))
     plt.legend(loc="best")
     plt.xlabel("Epoch")
     plt.ylabel("Accuracy")
+    plt.tight_layout()
     plt.savefig(output_dir / "accuracy.png")
 
     # ------------------------ #
