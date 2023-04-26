@@ -94,7 +94,7 @@ def get_args_parser():
     parser.add_argument("--seed", default=666, type=int)
 
     # 数据集参数
-    parser.add_argument("--data_dir", default="./data/cmn-eng.txt", type=str, help="txt数据文件地址")
+    parser.add_argument("--data_dir", default="./data/eng-zh.txt", type=str, help="txt数据文件地址")
     parser.add_argument("--src_lang", default="en", type=str, help="输入句子语言")
     parser.add_argument("--tgt_lang", default="zh", type=str, help="输出句子语言")
     parser.add_argument("--val_size", default=1000, type=int, help="验证数据量")
