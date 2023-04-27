@@ -6,7 +6,7 @@
 @ Author      : Mirrich Wang
 @ Version     : Python 3.8.12 (Conda)
 +++++++++++++++++++++++++++++++++++
-百度 PaddlePaddle 运行 MNIST 的 LeNet-5 案例
+百度 PaddlePaddle 运行 MNIST 的 CNN 案例
 CUDA: 11.6+8.4.0cudnn
 +++++++++++++++++++++++++++++++++++
 """

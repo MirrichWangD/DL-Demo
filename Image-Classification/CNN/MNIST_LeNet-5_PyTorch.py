@@ -4,7 +4,7 @@
     @Time        : 2022/8/10 9:36
     @Author      : Mirrich Wang 
     @Version     : Python 3.8.8 (Anaconda3)
-    @Description : PyTorch 框架的 LeNet-5 使用 MNIST 手写数字进行训练
+    @Description : PyTorch 框架的 CNN 使用 MNIST 手写数字进行训练
 """
 
 import os
@@ -68,7 +68,7 @@ print('Test: (%i, %i, %i, %i)' % (len(test_data), num_channels, image_size, imag
 
 
 class Net(nn.Module):
-    """ LeNet-5 卷积网络在 MNIST 28x28 手写数字上应用的修改版 """
+    """ CNN 卷积网络在 MNIST 28x28 手写数字上应用的修改版 """
 
     def __init__(self):
         super(Net, self).__init__()
@@ -234,7 +234,7 @@ def plot_train_history(history, num_epoch=epochs):
         plt.plot(range(1, num_epoch + 1), history[k][:num_epoch + 1])
         plt.plot(range(1, num_epoch + 1), history[f'val_{k}'][:num_epoch + 1])
         plt.legend(labels=['Train', 'Val'])
-        plt.title(f'MNIST LeNet-5 Train & Valid {k.title()}')
+        plt.title(f'MNIST CNN Train & Valid {k.title()}')
         plt.xlabel('Epoch')
         plt.ylabel(k.title())
         plt.grid(True)

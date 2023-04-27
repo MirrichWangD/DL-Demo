@@ -1,7 +1,7 @@
 # -*- encoding: utf-8 -*-",
 """
 +++++++++++++++++++++++++++++++++++
-@ File        : MNIST_demo_Paddle.py
+@ File        : MNIST_CNN_Paddle.py
 @ Time        : 2023/3/7 10:23
 @ Author      : Mirrich Wang
 @ Version     : Python 3.8.12 (Conda)

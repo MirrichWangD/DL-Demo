@@ -6,7 +6,7 @@
 @ Author      : Mirrich Wang
 @ Version     : Python 3.7.9 (env)
 +++++++++++++++++++++++++++++++++++
-TensorFlow 框架的 LeNet-5 使用 MNIST 手写数字进行训练
+TensorFlow 框架的 CNN 使用 MNIST 手写数字进行训练
 +++++++++++++++++++++++++++++++++++
 """
 

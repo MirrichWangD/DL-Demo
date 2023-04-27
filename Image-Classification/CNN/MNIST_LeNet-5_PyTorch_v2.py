@@ -6,7 +6,7 @@
 @ Author      : Mirrich Wang
 @ Version     : Python 3.8.8 (Anaconda3)
 +++++++++++++++++++++++++++++++++++
-PyTorch 框架的 LeNet-5 使用 MNIST 手写数字进行训练
+PyTorch 框架的 CNN 使用 MNIST 手写数字进行训练
 重构了代码结构：
 1): 在if __name__ == "__main__":下进行一系列操作，能够使用num_workers加快数据读取
 2): 将数据加载、模型构建、模型训练、验证使用了类进行封装
@@ -98,7 +98,7 @@ def load_data(root, batch_size=4, num_workers=0, valid_split=.2, method="image")
 
 
 class Net(nn.Module):
-    """ LeNet-5 卷积网络在 MNIST 28x28 手写数字灰色图像上应用版本 """
+    """ CNN 卷积网络在 MNIST 28x28 手写数字灰色图像上应用版本 """
 
     def __init__(self):
         super(Net, self).__init__()
@@ -145,7 +145,7 @@ class Net(nn.Module):
 
 
 class LeNet5(object):
-    """ LeNet-5 模型训练、验证相关类 """
+    """ CNN 模型训练、验证相关类 """
 
     # 默认配置
     cuda = True  # 是否使用 CUDA
@@ -282,7 +282,7 @@ if __name__ == "__main__":
         plt.plot(range(1, model_config["epochs"] + 1), train_history[k], label="Train")
         plt.plot(range(1, model_config["epochs"] + 1), train_history[f'val_{k}'], label="Val")
         plt.legend()
-        plt.title(f'MNIST LeNet-5 Train & Valid {k.title()}')
+        plt.title(f'MNIST CNN Train & Valid {k.title()}')
         plt.xlabel('Epoch')
         plt.ylabel(k.title())
         plt.grid(True)

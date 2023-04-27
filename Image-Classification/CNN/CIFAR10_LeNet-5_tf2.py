@@ -2,7 +2,7 @@
 
 """
 第05讲 卷积神经网络识别CIFAR-10图像
-LeNet-5 网络识别 CIFAR-10数据集
+CNN 网络识别 CIFAR-10数据集
 @ 参考龙老师书:p230页第十章 实战案例
 ======================================="""
 
@@ -25,7 +25,7 @@ X_img_test_normalize = X_img_test.astype('float32') / 255.0
 y_label_train_OneHot = tf.keras.utils.to_categorical(y_label_train)
 y_label_test_OneHot = tf.keras.utils.to_categorical(y_label_test)
 
-""""@@@ 网络块 LeNet-5 """
+""""@@@ 网络块 CNN """
 # 建立卷积神经网络模型（LeNet-5网络）
 model = tf.keras.Sequential()
 
