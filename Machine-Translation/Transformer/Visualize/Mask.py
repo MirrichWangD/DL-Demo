@@ -1,12 +1,12 @@
 # -*- coding: UTF-8 -*-
 """
 +++++++++++++++++++++++++++++++++++
-@ File        : SentenceToken.py
-@ Time        : 2023/4/26 15:31
+@ File        : Mask.py
+@ Time        : 2023/4/27 10:40
 @ Author      : Mirrich Wang
 @ Version     : Python 3.8.12 (Conda)
 +++++++++++++++++++++++++++++++++++
-批次的句子 Token 可视化程序
+Padding、Memory、src、tgt的掩码可视化
 依赖模块（需要自行安装，没有版本号默认最新）：
     torch 1.12.1+cu116
     torchtext 0.13.1
@@ -113,6 +113,51 @@ class TranslationDataset(Dataset):
 
 
 """++++++++++++++++++++++
+@@@ Mask处理
+++++++++++++++++++++++"""
+
+
+def generate_square_subsequent_mask(sz: int) -> torch.Tensor:
+    """
+    生成方形后续掩码
+    Args:
+        sz: int 生成方形掩码的尺寸
+        device: torch.device 运算硬件
+
+    Returns:
+        torch.tensor
+    """
+    # 生成倒三角全为 0 的矩阵
+    mask = (torch.triu(torch.ones((sz, sz))) == 1).transpose(0, 1)
+    # 将上三角全部使用 -inf 填充（不包括对角线）
+    mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+    return mask
+
+
+def create_mask(src: torch.Tensor, tgt: torch.Tensor) -> object:
+    """
+    根据 src、tgt 生成 src_mask、tgt_mask、src_padding_mask、tgt_padding_mask
+    Args:
+        src: torch.Tensor 输入词索引向量 (S_src, N)
+        tgt: torch.Tensor 输出词索引向量 (S_tgt, N)
+
+    Returns:
+        Tensor(S_src, S_src), Tensor(S_tgt, S_tgt), Tensor(N, S_src), Tensor(N, S_tgt)
+    """
+    src_seq_len = src.shape[0]
+    tgt_seq_len = tgt.shape[0]
+
+    # 生成方阵掩码
+    tgt_mask = generate_square_subsequent_mask(tgt_seq_len).to(src.device)
+    src_mask = torch.zeros((src_seq_len, src_seq_len), device=src.device).type(torch.bool)
+
+    # 生成词索引 padding 的掩码
+    src_padding_mask = (src == PAD_IDX).transpose(0, 1)
+    tgt_padding_mask = (tgt == PAD_IDX).transpose(0, 1)
+    return src_mask, tgt_mask, src_padding_mask, tgt_padding_mask
+
+
+"""++++++++++++++++++++++
 @@@ Batch采样处理
 ++++++++++++++++++++++"""
 
@@ -154,26 +199,58 @@ for src, tgt in db:
     if src.shape[0] == 16:
         fig, ax = plt.subplots(1, 4, figsize=(6, 4))
         fig1, ax1 = plt.subplots(1, 4, figsize=(6, 4))
+
+        fig2, ax2 = plt.subplots(1, 1)
+        fig3, ax3 = plt.subplots(1, 1)
+
+        tgt_input = tgt[:-1, :]
+
+        src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
+        sns.heatmap(src_mask, ax=ax2, cbar=False, annot=True, fmt=".0f")
+        sns.heatmap(tgt_mask, ax=ax3, cbar=False, annot=True, fmt=".0f")
         for idx in range(0, 4):
-            # 获取数据，生成句子列表
             src_token = src[:, idx * 8:(idx * 8) + 1]
             src_sentence = dataset.src_vocab.lookup_tokens(src_token.flatten().tolist())
             tgt_token = tgt[:, idx * 8:(idx * 8) + 1]
             tgt_sentence = dataset.tgt_vocab.lookup_tokens(tgt_token.flatten().tolist())
 
-            # 绘制热力图
-            sns.heatmap(src_token, ax=ax[idx], cbar=False, annot=True, fmt=".0f", xticklabels=[idx], cmap=cmap)
-            sns.heatmap(tgt_token, ax=ax1[idx], cbar=False, annot=True, fmt=".0f", xticklabels=[idx], cmap=cmap)
+            sns.heatmap(src_padding_mask[idx].unsqueeze(1),
+                        ax=ax[idx],
+                        cbar=False,
+                        annot=True,
+                        fmt=".0f",
+                        xticklabels=[idx],
+                        cmap=cmap)
+            sns.heatmap(tgt_padding_mask[idx].unsqueeze(1),
+                        ax=ax1[idx],
+                        cbar=False,
+                        annot=True,
+                        fmt=".0f",
+                        xticklabels=[idx],
+                        cmap=cmap)
             # 设置坐标轴为词
-            ax[idx].set_yticks(np.linspace(0.5, src.shape[0] - 0.5, src.shape[0]), rotation=0, labels=src_sentence)
-            ax1[idx].set_yticks(np.linspace(0.5, tgt.shape[0] - 0.5, tgt.shape[0]), rotation=0, labels=tgt_sentence)
+            ax[idx].set_yticks(np.linspace(0.5, src.shape[0] - 0.5, src.shape[0]),
+                               rotation=0,
+                               labels=src_sentence)
+            ax1[idx].set_yticks(np.linspace(0.5, tgt_input.shape[0] - 0.5, tgt_input.shape[0]),
+                                rotation=0,
+                                labels=tgt_sentence[:-1])
 
         # 保存图片
-        fig.suptitle("输入Token向量")
+        fig.suptitle("输入Padding Mask向量")
         fig.tight_layout()
-        fig.savefig("imgs/Token-src.png")
+        fig.savefig("imgs/Mask-Padding-src.png")
 
-        fig1.suptitle("输出Token向量")
+        fig1.suptitle("输出Padding Mask向量")
         fig1.tight_layout()
-        fig1.savefig("imgs/Token-tgt.png")
+        fig1.savefig("imgs/Mask-Padding-tgt.png")
+
+        fig2.suptitle("输入Mask向量")
+        fig2.tight_layout()
+        fig2.savefig("imgs/Mask-src.png")
+
+        fig3.suptitle("输出Mask向量")
+        fig3.tight_layout()
+        fig3.savefig("imgs/Mask-tgt.png")
+
         break
