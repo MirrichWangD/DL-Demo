@@ -9,22 +9,27 @@
 数据集：https://www.manythings.org/anki/
 模型参考文档：https://pytorch.org/tutorials/beginner/translation_transformer.html?highlight=transformer%20translation
 简要概述：
-    暂时只实验了中英翻译，cmn-eng/cmn.txt 繁中转换成了简中（参考 utils/cmn-zh.py）。该代码采用 Spacy 3.5 语言模型作为句子分词器，因此需
-    要提前安装对应语言模块，如 英文-简中 翻译，需要安装 zh_core_web_sm 和 en_core_web_sm，这些均可以在下方 SPACY 变量进行调整
+    暂时只实验了中英翻译，./data/eng-zh.txt 繁中转换成了简中（参考 utils/cmn-zh.py）。该代码采用 Spacy 3.5 语言模型生成tokenizer，
+    因此需要提前安装对应语言模块，如 英文-简中 翻译，需要安装 zh_core_web_sm 和 en_core_web_sm，这些均可以在下方 SPACY 变量进行调整
+    ！第一次改动：为整体代码增加 checkpoint 存储，该类型文件读取出来时 {"model": ..., "optimizer": ..., "epoch": ...} 字典
+    ！第二次改动：计算准确率部分调整成 map(lambda ...) 形式，加快准确率计算
+    ！第三次改动：增加测试推理结果时保存 <原始翻译>\t<模型翻译>\n 的行文本结果文件 test.txt
 实验设备：
-    CPU: 10th Gen Intel(R) Core(TM) i5-10400
-    GPU:  Nvidia GeForce RTX2060-Super 8GB
-依赖模块（需要自行安装，没有版本号默认最新）：
-    torch 1.12.1+cu116
-    torchtext 0.13.1
-    spacy 3.5.0
-    matplotlib
-    pandas
-    tqdm
+    CPU:    10th Gen Intel(R) Core(TM) i5-10400 2.9 GHz
+    GPU:    Nvidia GeForce RTX2060-Super 8GB
+    CUDA:   11.6 + CUDNN 8.3.02
+依赖模块（带*为可以最新版本）：
+    torch       1.12.1+cu116
+    torchtext   0.13.1
+    spacy       3.5.0
+    matplotlib  3.6.2*
+    pandas      1.5.1*
+    tqdm        4.64.1*
 +++++++++++++++++++++++++++++++++++
 """
 
 # 导入基础模块
+from collections import OrderedDict
 from pathlib import Path
 import warnings
 import argparse
@@ -43,7 +48,7 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader, BatchSampler
-from torchtext.vocab import build_vocab_from_iterator
+from torchtext.vocab import build_vocab_from_iterator, vocab
 from torchtext.data import get_tokenizer
 
 # 设置忽略warning信息
@@ -78,26 +83,29 @@ def get_args_parser():
     parser.add_argument("--seed", default=666, type=int)
 
     # 数据集参数
-    parser.add_argument("--data_dir", default="./data/eng-zh.txt", type=str, help="txt数据文件地址")
-    parser.add_argument("--src_lang", default="en", type=str, help="输入句子语言")
-    parser.add_argument("--tgt_lang", default="zh", type=str, help="输出句子语言")
+    parser.add_argument("--data_dir", default="./data/eng-zh.txt", type=str, help="表格间隔符的txt数据文件地址")
+    parser.add_argument("--src_lang", default="en", type=str, help="输入语言，如en：英语")
+    parser.add_argument("--tgt_lang", default="zh", type=str, help="输出语言，如zh：简中")
+    parser.add_argument("--src_dict", default=None, type=str, help="输入语言词典txt文件")
+    parser.add_argument("--tgt_dict", default=None, type=str, help="输出语言词典txt文件")
+    parser.add_argument("--min_freq", default=1, type=str, help="词频最少数量，小于该数将不会加载进词汇中")
     parser.add_argument("--val_size", default=1000, type=int, help="验证数据量")
     parser.add_argument("--test_size", default=100, type=int, help="测试数据量")
 
     # 模型部分参数
-    parser.add_argument("--n_enc_layers", default=6, type=int, help="编码器层数")
-    parser.add_argument("--n_dec_layers", default=6, type=int, help="解码器层数")
+    parser.add_argument("--n_enc_layers", default=6, type=int, help="Encoder编码器层数")
+    parser.add_argument("--n_dec_layers", default=6, type=int, help="Decoder解码器层数")
     parser.add_argument("--n_heads", default=8, type=int, help="多头注意力头的数量")
-    parser.add_argument("--d_model", default=512, type=int, help="嵌入层维数")
-    parser.add_argument("--d_ff", default=2048, type=int, help="前馈网络维数")
-    parser.add_argument("--dropout", default=.1, type=float, help="Dropout比例")
+    parser.add_argument("--d_model", default=512, type=int, help="Embedding嵌入层维数")
+    parser.add_argument("--d_ff", default=2048, type=int, help="FFN维数")
+    parser.add_argument("--dropout", default=.1, type=float, help="LN层Dropout比例")
     parser.add_argument("--resume", default=None, type=str, help="导入模型权重路径")
 
     # 训练参数
     parser.add_argument("--epochs", default=100, type=int, help="训练轮数")
     parser.add_argument("--lr", default=0.0001, type=float, help="学习率")
     parser.add_argument("--batch_size", default=64, type=int, help="批数量")
-    parser.add_argument("--n_workers", default=0, type=int, help="读取数据进程数，在IDE运行时请设置为0")
+    parser.add_argument("--n_workers", default=0, type=int, help="读取数据进程数，使用交互式窗口运行时请设置为0")
     parser.add_argument("--device", default="cuda:0", type=str, help="运算设备")
     parser.add_argument("--output", default="output/eng-zh", type=str, help="训练结果保存路径")
 
@@ -112,7 +120,12 @@ def get_args_parser():
 class TranslationDataset(Dataset):
     """ 机器翻译数据集 """
 
-    def __init__(self, file_path: str, src_lang: str = "en", tgt_lang: str = "zh"):
+    def __init__(self,
+                 file_path: str,
+                 src_lang: str = "en",
+                 tgt_lang: str = "zh",
+                 src_dict: str = None,
+                 tgt_dict: str = None):
         """
 
         Args:
@@ -141,8 +154,22 @@ class TranslationDataset(Dataset):
             self.tgt_sentences.append(self.tgt_tokenizer(tgt))
 
         # 构建词汇表对象
-        self.src_vocab = build_vocab_from_iterator(self.src_sentences, 1, specials=SPECIALS)
-        self.tgt_vocab = build_vocab_from_iterator(self.tgt_sentences, 1, specials=SPECIALS)
+        if src_dict is not None:
+            with open(src_dict, encoding="utf-8") as f:
+                src_words = list(map(lambda i: i.strip(), f.readlines()))
+            self.src_vocab = vocab(OrderedDict(zip(src_words, [10] * len(src_words))))
+        else:
+            self.src_vocab = build_vocab_from_iterator(self.src_sentences, 1, specials=SPECIALS)
+        if tgt_dict is not None:
+            with open(tgt_dict, encoding="utf-8") as f:
+                tgt_words = list(map(lambda i: i.strip(), f.readlines()))
+            self.tgt_vocab = vocab(OrderedDict(zip(tgt_words, [10] * len(tgt_words))))
+        else:
+            self.tgt_vocab = build_vocab_from_iterator(self.tgt_sentences, 1, specials=SPECIALS)
+
+        # 设置默认字符为 <unk> 的索引
+        self.src_vocab.set_default_index(UNK_IDX)
+        self.tgt_vocab.set_default_index(UNK_IDX)
 
     def __len__(self):
         """ 数据集整体长度 """
@@ -411,7 +438,8 @@ if __name__ == "__main__":
     # ------------------------ #
 
     # 构建数据集
-    dataset = TranslationDataset(file_path=args.data_dir, src_lang=args.src_lang, tgt_lang=args.tgt_lang)
+    dataset = TranslationDataset(file_path=args.data_dir, src_lang=args.src_lang, tgt_lang=args.tgt_lang,
+                                 src_dict=args.src_dict, tgt_dict=args.tgt_dict)
     print(dataset)
     # 保存 vocab
     with open(output_dir / "src_dict.txt", "w+", encoding="utf-8") as f:
@@ -473,7 +501,7 @@ if __name__ == "__main__":
             for step, (src, tgt) in enumerate(train_db):
                 # 转移张量至指定运算硬件上
                 src, tgt = src.to(args.device), tgt.to(args.device)
-                tgt_input = tgt[:-1, :]  # 前移一位，不需要终止符
+                tgt_input = tgt[:-1, :]  # 删除最后一位，为了匹配最后预测的形状
 
                 # 生成 mask
                 src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
@@ -619,12 +647,18 @@ if __name__ == "__main__":
     # ------------------------ #
 
     print("Start Testing...")
-    for src, tgt in test_db:
-        src = src.to(args.device)
-        num_tokens = src.shape[0]
-        src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool).to(args.device)
-        tgt_tokens = greedy_decode(model, src, src_mask, num_tokens + 5, BOS_IDX)
+    with open(output_dir / "test.txt", "a", encoding="utf-8") as f:
+        for src, tgt in test_db:
+            src = src.to(args.device)
+            num_tokens = src.shape[0]
+            src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool).to(args.device)
+            tgt_tokens = greedy_decode(model, src, src_mask, num_tokens + 5, BOS_IDX)
 
-        print("原始翻译：", " ".join(dataset.tgt_vocab.lookup_tokens(tgt.flatten().tolist())))
-        print("模型翻译：", " ".join(dataset.tgt_vocab.lookup_tokens(tgt_tokens.flatten().tolist())))
-        print()
+            tgt_sentence = " ".join(dataset.tgt_vocab.lookup_tokens(tgt.flatten()[1:-1].tolist()))
+            pred_sentence = " ".join(dataset.tgt_vocab.lookup_tokens(tgt_tokens.flatten()[1:-1].tolist()))
+
+            f.write(f"{tgt_sentence}\t{pred_sentence}\n")
+
+            print(f"原始翻译：{tgt_sentence}", )
+            print(f"模型翻译：{pred_sentence}")
+            print()
