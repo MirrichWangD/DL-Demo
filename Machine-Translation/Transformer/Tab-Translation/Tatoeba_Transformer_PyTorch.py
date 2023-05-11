@@ -1,11 +1,11 @@
 # -*- coding: UTF-8 -*-
 """
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++
 @ File        : Tatoeba_Transformer_PyTorch.py
 @ Time        : 2023/4/25 11:25
 @ Author      : Mirrich Wang
 @ Version     : Python 3.8.12 (Conda)
-++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
++++++++++++++++++++++++++++++++++++
 数据集：https://www.manythings.org/anki/
 模型参考文档：https://pytorch.org/tutorials/beginner/translation_transformer.html?highlight=transformer%20translation
 简要概述：
@@ -14,17 +14,37 @@
     ！第一次改动：为整体代码增加 checkpoint 存储，该类型文件读取出来时 {"model": ..., "optimizer": ..., "epoch": ...} 字典
     ！第二次改动：计算准确率部分调整成 map(lambda ...) 形式，加快准确率计算
     ！第三次改动：增加测试推理结果时保存 <原始翻译>\t<模型翻译>\n 的行文本结果文件 test.txt
+    ！第四次改动：增加  mode（设置脚本训练/验证推理模式） 和 max_len（分词后最大长度）传入参数，将 __main__ 脚本全部封装进 main() 函数
 实验设备：
     CPU:    10th Gen Intel(R) Core(TM) i5-10400 2.9 GHz
     GPU:    Nvidia GeForce RTX2060-Super 8GB
     CUDA:   11.6 + CUDNN 8.3.02
 依赖模块（带*为可以最新版本）：
     torch       1.12.1+cu116
-    torchtext   0.13.1
-    spacy       3.5.0
+    torchtext   0.13.1 (必须 >= 0.10.0)
+    spacy       3.5.0 (语言模型帮助文档链接：https://spacy.io/models）
     matplotlib  3.6.2*
     pandas      1.5.1*
     tqdm        4.64.1*
+实验记录：(max_len: 40; epochs: 40)
+    eng-zh: 英文-简中 (batch_size: 128)
+        size: 29155
+        src vocab (en): 7899
+        tgt vocab (zh): 11332
+        Epoch: 40/40: 100% 220/220 [00:50<00:00,  4.32it/s, loss=0.2639, acc=93.44%, loss_val=2.5564, acc_val=65.00%]
+        Evaluating: 100%|██████████| 8/8 [00:00<00:00, 14.45it/s, loss_val=2.5120, acc_val=65.41%]
+    fre-eng: 法语-英文 (batch_size: 128)
+        size: 134594
+        src vocab (fr): 22760
+        tgt vocab (en): 14441
+        Epoch: 40/40: 100% 1043/1043 [03:40<00:00,  4.73it/s, loss=0.1917, acc=95.18%, loss_val=1.1674, acc_val=83.47%]
+        Evaluating: 100%|██████████| 8/8 [00:00<00:00, 15.79it/s, loss_val=1.0950, acc_val=83.56%]
+    eng-deu: 英文-德语 (batch_size: 64)
+        size: 255816
+        src vocab (de): 18971
+        tgt vocab (en): 41032
+        Epoch: 40/40: 100% 3980/3980 [12:53<00:00,  5.14it/s, loss=0.9235, acc=86.41%, loss_val=1.5359, acc_val=78.17%]
+        Evaluating: 100%|██████████| 16/16 [00:01<00:00, 14.33it/s, loss_val=1.2981, acc_val=78.83%]
 +++++++++++++++++++++++++++++++++++
 """
 
@@ -47,7 +67,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch import Tensor
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset, DataLoader, BatchSampler
 from torchtext.vocab import build_vocab_from_iterator, vocab
@@ -60,16 +79,16 @@ warnings.filterwarnings("ignore")
 @@@ 全局变量
 ++++++++++++++++++++++++"""
 
-LANGUAGE = {}
 # 定义特殊TOKEN
 PAD_IDX, UNK_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
 SPECIALS = ["<pad>", "<unk>", "<bos>", "<eos>"]
 # 定义 spacy 语言模型库，用于分词，该部分可以自行增加
 # 注意！运行时请确保输入的 src_lang 和 tgt_lang 能够在此查询到相对应的 Spacy 语言模块，否则会构造数据集时报错
 SPACY = {
-    "de": "de_core_news_sm",
-    "en": "en_core_web_sm",
-    "zh": "zh_core_web_sm"
+    "de": "de_core_news_sm",  # German 德语
+    "en": "en_core_web_sm",  # English 英语
+    "zh": "zh_core_web_sm",  # Chinese 简中
+    "fr": "fr_core_news_sm"  # French 法语
 }
 
 """+++++++++++++++++++++++++
@@ -85,11 +104,12 @@ def get_args_parser():
     parser.add_argument("--seed", default=666, type=int)
 
     # 数据集参数
-    parser.add_argument("--data_dir", default="./data/eng-zh.txt", type=str, help="表格间隔符的txt数据文件地址")
+    parser.add_argument("--data_dir", default="./data/eng-deu.txt", type=str, help="表格间隔符的txt数据文件地址")
     parser.add_argument("--src_lang", default="en", type=str, help="输入语言，如en：英语")
-    parser.add_argument("--tgt_lang", default="zh", type=str, help="输出语言，如zh：简中")
-    parser.add_argument("--src_dict", default=None, type=str, help="输入语言词典txt文件")
-    parser.add_argument("--tgt_dict", default=None, type=str, help="输出语言词典txt文件")
+    parser.add_argument("--tgt_lang", default="de", type=str, help="输出语言，如zh：简zh")
+    parser.add_argument("--src_dict", default=None, type=str, help="预测时输入语言词典txt文件")
+    parser.add_argument("--tgt_dict", default=None, type=str, help="预测时输出语言词典txt文件")
+    parser.add_argument("--max_len", default=40, type=int, help="句子向量最大长度")
     parser.add_argument("--min_freq", default=1, type=str, help="词频最少数量，小于该数将不会加载进词汇中")
     parser.add_argument("--val_size", default=1000, type=int, help="验证数据量")
     parser.add_argument("--test_size", default=100, type=int, help="测试数据量")
@@ -104,12 +124,13 @@ def get_args_parser():
     parser.add_argument("--resume", default=None, type=str, help="导入模型权重路径")
 
     # 训练参数
+    parser.add_argument("--mode", default="train", choices=["train", "eval"], help="脚本模式，train：训练；eval：验证")
     parser.add_argument("--epochs", default=40, type=int, help="训练轮数")
     parser.add_argument("--lr", default=0.0001, type=float, help="学习率")
     parser.add_argument("--batch_size", default=64, type=int, help="批数量")
     parser.add_argument("--n_workers", default=0, type=int, help="读取数据进程数，使用交互式窗口运行时请设置为0")
     parser.add_argument("--device", default="cuda:0", type=str, help="运算设备")
-    parser.add_argument("--output", default="output/eng-zh", type=str, help="训练结果保存路径")
+    parser.add_argument("--output", default="output/eng-deu", type=str, help="训练结果保存路径")
 
     return parser
 
@@ -124,10 +145,12 @@ class TranslationDataset(Dataset):
 
     def __init__(self,
                  file_path: str,
-                 src_lang: str = "en",
-                 tgt_lang: str = "zh",
+                 src_lang: str,
+                 tgt_lang: str,
                  src_dict: str = None,
-                 tgt_dict: str = None):
+                 tgt_dict: str = None,
+                 max_len: int = 256,
+                 min_freq: int = 1):
         """
 
         Args:
@@ -150,24 +173,23 @@ class TranslationDataset(Dataset):
         self.tgt_tokenizer = get_tokenizer("spacy", language=SPACY[tgt_lang])
 
         # 迭代原始数据，进行分词处理
-        data = texts[[LANGUAGE[src_lang], LANGUAGE[tgt_lang]]].values
-        for src, tgt in tqdm(data, total=self.length, desc="Loading Data"):
-            self.src_sentences.append(self.src_tokenizer(src))
-            self.tgt_sentences.append(self.tgt_tokenizer(tgt))
+        for (src, tgt) in tqdm(texts[[0, 1]].values, total=self.length, desc="Tokenizing Data"):
+            self.src_sentences.append(self.src_tokenizer(src)[:max_len])
+            self.tgt_sentences.append(self.tgt_tokenizer(tgt)[:max_len])
 
         # 构建词汇表对象
         if src_dict is not None:
-            with open(src_dict, encoding="utf-8") as f:
-                src_words = list(map(lambda i: i.strip(), f.readlines()))
+            with open(src_dict, encoding="utf-8") as fp:
+                src_words = list(map(lambda i: i.strip("\n"), fp.readlines()))
             self.src_vocab = vocab(OrderedDict(zip(src_words, [10] * len(src_words))))
         else:
-            self.src_vocab = build_vocab_from_iterator(self.src_sentences, 1, specials=SPECIALS)
+            self.src_vocab = build_vocab_from_iterator(self.src_sentences, min_freq, specials=SPECIALS)
         if tgt_dict is not None:
-            with open(tgt_dict, encoding="utf-8") as f:
-                tgt_words = list(map(lambda i: i.strip(), f.readlines()))
+            with open(tgt_dict, encoding="utf-8") as fp:
+                tgt_words = list(map(lambda i: i.strip("\n"), fp.readlines()))
             self.tgt_vocab = vocab(OrderedDict(zip(tgt_words, [10] * len(tgt_words))))
         else:
-            self.tgt_vocab = build_vocab_from_iterator(self.tgt_sentences, 1, specials=SPECIALS)
+            self.tgt_vocab = build_vocab_from_iterator(self.tgt_sentences, min_freq, specials=SPECIALS)
 
         # 设置默认字符为 <unk> 的索引
         self.src_vocab.set_default_index(UNK_IDX)
@@ -197,12 +219,11 @@ class TranslationDataset(Dataset):
 ++++++++++++++++++++++"""
 
 
-def generate_square_subsequent_mask(sz: int) -> Tensor:
+def generate_square_subsequent_mask(sz: int) -> torch.Tensor:
     """
     生成方形后续掩码
     Args:
         sz: int 生成方形掩码的尺寸
-        device: torch.device 运算硬件
 
     Returns:
         torch.tensor
@@ -214,7 +235,7 @@ def generate_square_subsequent_mask(sz: int) -> Tensor:
     return mask
 
 
-def create_mask(src: Tensor, tgt: Tensor) -> object:
+def create_mask(src: torch.Tensor, tgt: torch.Tensor) -> object:
     """
     根据 src、tgt 生成 src_mask、tgt_mask、src_padding_mask、tgt_padding_mask
     Args:
@@ -281,7 +302,7 @@ class PositionalEncoding(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.register_buffer('pos_embedding', pos_embedding)
 
-    def forward(self, token_embedding: Tensor):
+    def forward(self, token_embedding: torch.Tensor):
         return self.dropout(token_embedding + self.pos_embedding[:token_embedding.size(0), :])
 
 
@@ -294,7 +315,7 @@ class TokenEmbedding(nn.Module):
         self.embedding = nn.Embedding(vocab_size, emb_size)
         self.emb_size = emb_size
 
-    def forward(self, tokens: Tensor):
+    def forward(self, tokens: torch.Tensor):
         return self.embedding(tokens.long()) * math.sqrt(self.emb_size)
 
 
@@ -325,23 +346,23 @@ class Transformer(nn.Module):
         self.positional_encoding = PositionalEncoding(d_model, dropout=dropout)
 
     def forward(self,
-                src: Tensor,
-                trg: Tensor,
-                src_mask: Tensor,
-                tgt_mask: Tensor,
-                src_padding_mask: Tensor,
-                tgt_padding_mask: Tensor,
-                memory_key_padding_mask: Tensor):
+                src: torch.Tensor,
+                trg: torch.Tensor,
+                src_mask: torch.Tensor,
+                tgt_mask: torch.Tensor,
+                src_padding_mask: torch.Tensor,
+                tgt_padding_mask: torch.Tensor,
+                memory_key_padding_mask: torch.Tensor):
         src_emb = self.positional_encoding(self.src_tok_emb(src))
         tgt_emb = self.positional_encoding(self.tgt_tok_emb(trg))
         outs = self.transformer(src_emb, tgt_emb, src_mask, tgt_mask, None,
                                 src_padding_mask, tgt_padding_mask, memory_key_padding_mask)
         return self.generator(outs)
 
-    def encode(self, src: Tensor, src_mask: Tensor):
+    def encode(self, src: torch.Tensor, src_mask: torch.Tensor):
         return self.transformer.encoder(self.positional_encoding(self.src_tok_emb(src)), src_mask)
 
-    def decode(self, tgt: Tensor, memory: Tensor, tgt_mask: Tensor):
+    def decode(self, tgt: torch.Tensor, memory: torch.Tensor, tgt_mask: torch.Tensor):
         return self.transformer.decoder(self.positional_encoding(self.tgt_tok_emb(tgt)), memory, tgt_mask)
 
 
@@ -352,10 +373,10 @@ class Transformer(nn.Module):
 
 # function to generate output sequence using greedy algorithm
 def greedy_decode(model: nn.Module,
-                  src: Tensor,
-                  src_mask: Tensor,
+                  src: torch.Tensor,
+                  src_mask: torch.Tensor,
                   max_len: int,
-                  start_symbol: int) -> Tensor:
+                  start_symbol: int) -> torch.Tensor:
     """
     预测所使用的贪婪解码算法
     Args:
@@ -364,7 +385,6 @@ def greedy_decode(model: nn.Module,
         src_mask: torch.Tensor 输入词向量 mask (S_src, S_src)
         max_len: int 预测最大句子长度，通常时 S_src + 5
         start_symbol: int 起始符索引，默认为 2
-        device: torch.device 运算设备
 
     Returns:
         Tensor(S_pred, 1)
@@ -385,32 +405,7 @@ def greedy_decode(model: nn.Module,
     return ys
 
 
-def translate(model: torch.nn.Module, src_sentence: str, tokenizer, vocab, device) -> str:
-    """
-
-    Args:
-        model: torch.nn.Module 模型对象
-        src_sentence: str 待翻译句子
-        tokenizer: functools.partial 分词器
-        vocab: torchtext.vocab.vocab.Vocab torchtext生成的词汇对象
-        device: torch.device 运算设备
-
-    Returns:
-        str
-    """
-    model.eval()
-    src = tokenizer(src_sentence).view(-1, 1)
-    num_tokens = src.shape[0]
-    src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool)
-    tgt_tokens = greedy_decode(
-        model, src, src_mask, max_len=num_tokens + 5, start_symbol=BOS_IDX, device=device).flatten()
-    return " ".join(vocab.lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
-
-
-if __name__ == "__main__":
-    parser = get_args_parser()
-    args = parser.parse_args()
-
+def main(args):
     # ------------------------ #
     # Config
     # ------------------------ #
@@ -422,9 +417,6 @@ if __name__ == "__main__":
     torch.cuda.manual_seed_all(args.seed)
     torch.backends.cudnn.deterministic = True
 
-    # 将输入和翻译语言构造索引
-    LANGUAGE[args.src_lang] = 0
-    LANGUAGE[args.tgt_lang] = 1
     if args.src_lang not in SPACY.keys() or args.tgt_lang not in SPACY.keys():
         raise "请确保 spacy 模块中是否包含设置的输入、输出语言！"
     # 设置开始轮数
@@ -434,20 +426,22 @@ if __name__ == "__main__":
     # 获取输出目录
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "metrics").mkdir(parents=True, exist_ok=True)
+    (output_dir / "words").mkdir(parents=True, exist_ok=True)
 
     # ------------------------ #
     # Load Data
     # ------------------------ #
 
     # 构建数据集
-    dataset = TranslationDataset(file_path=args.data_dir, src_lang=args.src_lang, tgt_lang=args.tgt_lang,
-                                 src_dict=args.src_dict, tgt_dict=args.tgt_dict)
+    dataset = TranslationDataset(file_path=args.data_dir,
+                                 src_lang=args.src_lang,
+                                 tgt_lang=args.tgt_lang,
+                                 src_dict=args.src_dict,
+                                 tgt_dict=args.tgt_dict,
+                                 max_len=args.max_len,
+                                 min_freq=args.min_freq)
     print(dataset)
-    # 保存 vocab
-    with open(output_dir / "src_dict.txt", "w+", encoding="utf-8") as f:
-        f.writelines(map(lambda i: i + "\n", dataset.src_vocab.get_itos()))
-    with open(output_dir / "tgt_dict.txt", "w+", encoding="utf-8") as f:
-        f.writelines(map(lambda i: i + "\n", dataset.tgt_vocab.get_itos()))
 
     # 划分训练、验证、测试集，分批
     indices = np.arange(len(dataset))
@@ -487,134 +481,135 @@ if __name__ == "__main__":
     # Training and Evaluate Model
     # ---------------------------- #
 
-    print("Start training...")
-    BEST_ACC = 0.  # 记录最优准确率的 epoch
-    # 记录每个 step 的损失喝准确率
-    LOSS = {"train": [[] for _ in range(args.epochs)], "val": [[] for _ in range(args.epochs)]}
-    ACC = {"train": [[] for _ in range(args.epochs)], "val": [[] for _ in range(args.epochs)]}
+    if args.mode == "train":
+        print("Start training...")
+        # 保存 vocab
+        with open(output_dir / "words" / "src_dict.txt", "w+", encoding="utf-8") as fp:
+            fp.writelines(map(lambda i: i + "\n", dataset.src_vocab.get_itos()))
+        with open(output_dir / "words" / "tgt_dict.txt", "w+", encoding="utf-8") as fp:
+            fp.writelines(map(lambda i: i + "\n", dataset.tgt_vocab.get_itos()))
+        # 记录每个 step 的损失喝准确率
+        train_history = {"loss": {"train": [[] for _ in range(args.epochs)], "val": [[] for _ in range(args.epochs)]},
+                         "acc": {"train": [[] for _ in range(args.epochs)], "val": [[] for _ in range(args.epochs)]},
+                         "best_acc": 0.}
 
-    st = time.time()
-    for epoch in range(start_epoch + 1, args.epochs):
-        # 初始化准确率计算变量
-        correct, total = {"train": 0, "val": 0}, {"train": 0, "val": 0}
+        st = time.time()
+        for epoch in range(start_epoch + 1, args.epochs):
+            # 初始化准确率计算变量
+            correct, total = {"train": 0, "val": 0}, {"train": 0, "val": 0}
 
-        model.train()
-        with tqdm(total=len(train_db), desc=f"Epoch: {epoch + 1}/{args.epochs}") as pbar:  # 训练进度条
-            for step, (src, tgt) in enumerate(train_db):
-                # 转移张量至指定运算硬件上
-                src, tgt = src.to(args.device), tgt.to(args.device)
-                tgt_input = tgt[:-1, :]  # 删除最后一位，为了匹配最后预测的形状
+            model.train()
+            with tqdm(total=len(train_db), desc=f"Epoch: {epoch + 1}/{args.epochs}") as pbar:  # 训练进度条
+                for step, (src, tgt) in enumerate(train_db):
+                    # 转移张量至指定运算硬件上
+                    src, tgt = src.to(args.device), tgt.to(args.device)
+                    tgt_input = tgt[:-1, :]  # 删除最后一位，为了匹配最后预测的形状
 
-                # 生成 mask
-                src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
+                    # 生成 mask
+                    src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
 
-                # 计算每个词的概率
-                logits = model(src, tgt_input, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask, src_padding_mask)
+                    # 计算每个词的概率
+                    logits = model(src, tgt_input, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask,
+                                   src_padding_mask)
 
-                optimizer.zero_grad()  # 初始化优化器梯度
+                    optimizer.zero_grad()  # 初始化优化器梯度
 
-                # 计算损失
-                tgt_out = tgt[1:, :]  # 前移一位，不需要起始符
-                loss = criterion(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
-                loss.backward()  # 反向传播
+                    # 计算损失
+                    tgt_out = tgt[1:, :]  # 前移一位，不需要起始符
+                    loss = criterion(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+                    loss.backward()  # 反向传播
 
-                optimizer.step()  # 更新模型参数
+                    optimizer.step()  # 更新模型参数
 
-                # 计算准确率
-                pred = torch.argmax(F.log_softmax(logits, -1), -1)
-                L = (tgt_out != PAD_IDX).sum(0)
-                total["train"] += L.sum().item()
-                correct["train"] += sum(map(
-                    lambda i: (pred[:L[i], i] == tgt_out[:L[i], i]).sum().item(), range(pred.shape[1])
-                ))
-                # # 计算准确率
-                # for i in range(pred.shape[1]):
-                #     L = (tgt_out[:, i] != PAD_IDX).sum()
-                #     total["train"] += L.item()
-                #     correct["train"] += (pred[:L, i] == tgt_out[:L, i]).sum().item()
+                    # 计算准确率
+                    pred = torch.argmax(F.log_softmax(logits, -1), -1)
+                    L = (tgt_out != PAD_IDX).sum(0)
+                    total["train"] += L.sum().item()
+                    correct["train"] += sum(map(
+                        lambda i: (pred[:L[i], i] == tgt_out[:L[i], i]).sum().item(), range(pred.shape[1])
+                    ))
 
-                # 记录损失、准确率
-                LOSS["train"][epoch].append(loss.item())
-                ACC["train"][epoch].append(correct["train"] / total["train"])
-                # 更新进度条
-                pbar.update(1)
-                pbar.set_postfix({"loss": f"{np.mean(LOSS['train'][epoch]).item():.4f}",
-                                  "acc": f"{np.mean(ACC['train'][epoch]).item() * 100:.2f}%"})
+                    # 记录损失、准确率
+                    train_history["loss"]["train"][epoch].append(loss.item())
+                    train_history["acc"]["train"][epoch].append(correct["train"] / total["train"])
+                    # 更新进度条
+                    pbar.update(1)
+                    pbar.set_postfix({"loss": f"{np.mean(train_history['loss']['train'][epoch]).item():.4f}",
+                                      "acc": f"{np.mean(train_history['acc']['train'][epoch]).item() * 100:.2f}%"})
 
-            # 训练完一个 epoch 后进行验证
-            model.eval()
-            for step, (src, tgt) in enumerate(val_db):
-                src, tgt = src.to(args.device), tgt.to(args.device)
-                tgt_input = tgt[:-1, :]
+                # 训练完一个 epoch 后进行验证
+                model.eval()
+                for step, (src, tgt) in enumerate(val_db):
+                    src, tgt = src.to(args.device), tgt.to(args.device)
+                    tgt_input = tgt[:-1, :]
 
-                src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
+                    src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
 
-                logits = model(src, tgt_input, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask, src_padding_mask)
+                    logits = model(src, tgt_input, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask,
+                                   src_padding_mask)
 
-                tgt_out = tgt[1:, :]
-                loss = criterion(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+                    tgt_out = tgt[1:, :]
+                    loss = criterion(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
 
-                # 计算准确率
-                pred = torch.argmax(F.log_softmax(logits, -1), -1)
-                L = (tgt_out != PAD_IDX).sum(0)
-                total["val"] += L.sum().item()
-                correct["val"] += sum(map(
-                    lambda i: (pred[:L[i], i] == tgt_out[:L[i], i]).sum().item(), range(pred.shape[1])
-                ))
+                    # 计算准确率
+                    pred = torch.argmax(F.log_softmax(logits, -1), -1)
+                    L = (tgt_out != PAD_IDX).sum(0)
+                    total["val"] += L.sum().item()
+                    correct["val"] += sum(map(
+                        lambda i: (pred[:L[i], i] == tgt_out[:L[i], i]).sum().item(), range(pred.shape[1])
+                    ))
 
-                # 记录验证损失、准确率
-                LOSS["val"][epoch].append(loss.item())
-                ACC["val"][epoch].append(correct["val"] / total["val"])
-                # 更新进度条
-                pbar.set_postfix({"loss": f"{np.mean(LOSS['train'][epoch]).item():.4f}",
-                                  "acc": f"{np.mean(ACC['train'][epoch]).item() * 100:.2f}%",
-                                  "loss_val": f"{np.mean(LOSS['val'][epoch]).item():.4f}",
-                                  "acc_val": f"{np.mean(ACC['val'][epoch]).item() * 100:.2f}%"})
+                    # 记录验证损失、准确率
+                    train_history["loss"]["val"][epoch].append(loss.item())
+                    train_history["acc"]["val"][epoch].append(correct["val"] / total["val"])
+                    # 更新进度条
+                    pbar.set_postfix({"loss": f"{np.mean(train_history['loss']['train'][epoch]).item():.4f}",
+                                      "acc": f"{np.mean(train_history['acc']['train'][epoch]).item() * 100:.2f}%",
+                                      "loss_val": f"{np.mean(train_history['loss']['val'][epoch]).item():.4f}",
+                                      "acc_val": f"{np.mean(train_history['acc']['val'][epoch]).item() * 100:.2f}%"})
 
-            # 判断验证数据平均准确率是否大于最优准确率，若更高则保存 best_model.pth
-            if np.mean(ACC["val"][epoch]).item() > BEST_ACC:
-                BEST_ACC = np.mean(ACC["val"][epoch]).item()
-                torch.save({"model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch},
-                           output_dir / "best_model.pth")
+                # 判断验证数据平均准确率是否大于最优准确率，若更高则保存 best_model.pth
+                if np.mean(train_history["acc"]["val"][epoch]).item() > train_history["best_acc"]:
+                    train_history["best_acc"] = np.mean(train_history["acc"]["val"][epoch]).item()
+                    torch.save({"model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch},
+                               output_dir / "best_model.pth")
 
-    et = time.time()
-    print("Time taken: %ds" % (et - st))
+        et = time.time()
+        print("Time taken: %ds" % (et - st))
 
-    # 保存最终的模型权重
-    torch.save({"model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": args.epochs},
-               output_dir / "final_model.pth")
-    print("模型权重保存到：%s" % output_dir)
-    # 保存损失、准确率
-    print("训练、验证损失和准确率保存到：%s" % (output_dir / "metrics.json"))
-    with open(output_dir / "metrics.json", "w", encoding="utf-8") as f:
-        json.dump({"loss": LOSS, "acc": ACC}, f)
+        # 保存最终的模型权重
+        torch.save({"model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": args.epochs},
+                   output_dir / "final_model.pth")
+        print("模型权重保存到：%s" % output_dir)
+        # 保存损失、准确率
+        print("训练、验证损失和准确率保存到：%s" % (output_dir / "metrics" / "train_history.json"))
+        with open(output_dir / "metrics" / "train_history.json", "w", encoding="utf-8") as f:
+            json.dump(train_history, f)
 
-    # ------------------------ #
-    # Visualization
-    # ------------------------ #
-
-    # 绘制损失图
-    fig, axes = plt.subplots(1, 2, dpi=100)
-    axes[0].plot(np.mean(LOSS["train"], 1), label="Train")
-    axes[0].plot(np.mean(LOSS["val"], 1), label="Val")
-    axes[0].legend(loc="best")
-    axes[0].set_xlabel("Epoch")
-    axes[0].set_ylabel("Loss")
-    # 绘制精准率图
-    axes[1].plot(np.mean(ACC["train"], 1), label="Train")
-    axes[1].plot(np.mean(ACC["val"], 1), label="Val")
-    axes[1].legend(loc="best")
-    axes[1].set_xlabel("Epoch")
-    axes[1].set_ylabel("Accuracy")
-    fig.tight_layout()
-    fig.savefig(output_dir / "accuracy.png")
+        # 可视化训练过程（损失、准确率）
+        ## 绘制损失图
+        fig, ax = plt.subplots(1, 1, dpi=200)
+        ax.plot(np.mean(train_history["loss"]["train"], 1), label="Train")
+        ax.plot(np.mean(train_history["loss"]["val"], 1), label="Val")
+        ax.legend(loc="best")
+        ax.set_xlabel("Epoch")
+        ax.set_ylabel("Loss")
+        fig.tight_layout()
+        fig.savefig(output_dir / "metrics" / "loss.png")
+        ## 绘制精准率图
+        fig, ax = plt.subplots(1, 1, dpi=200)
+        ax.plot(np.mean(train_history["acc"]["train"], 1), label="Train")
+        ax.plot(np.mean(train_history["acc"]["val"], 1), label="Val")
+        ax.legend(loc="best")
+        ax.set_xlabel("Epoch")
+        ax.set_ylabel("Accuracy")
+        fig.tight_layout()
+        fig.savefig(output_dir / "metrics" / "accuracy.png")
 
     # ------------------------ #
     # Evaluating Model
     # ------------------------ #
 
-    # 读取模型权重
-    # model.load_state_dict(torch.load(output_dir / "model.pth"))
     print("Start Evaluate...")
     correct, total = 0, 0
     model.eval()
@@ -661,3 +656,10 @@ if __name__ == "__main__":
             print(f"原始翻译：{tgt_sentence}", )
             print(f"模型翻译：{pred_sentence}")
             print()
+
+
+if __name__ == "__main__":
+    parser = get_args_parser()
+    args = parser.parse_args()
+
+    main(args)
