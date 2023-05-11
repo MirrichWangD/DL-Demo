@@ -93,6 +93,9 @@ SPACY = {
 
 """+++++++++++++++++++++++++
 @@@ 变量对象定义
+    - 运行代码前请先查阅该部分，配置个人训练数据集参数、模型参数和训练参数再运行
+    - 提示：如果是使用 Spyder、PyCharm、VS Code 等IDE内核运行的，请将n_workers设置为0！
+    - 预测时请设置 mode="eval"，resume、src_dict、tgt_dict 的默认值（default）
 +++++++++++++++++++++++++"""
 
 
@@ -128,7 +131,7 @@ def get_args_parser():
     parser.add_argument("--epochs", default=40, type=int, help="训练轮数")
     parser.add_argument("--lr", default=0.0001, type=float, help="学习率")
     parser.add_argument("--batch_size", default=64, type=int, help="批数量")
-    parser.add_argument("--n_workers", default=0, type=int, help="读取数据进程数，使用交互式窗口运行时请设置为0")
+    parser.add_argument("--n_workers", default=0, type=int, help="DataLoader读取数据开启进程数")
     parser.add_argument("--device", default="cuda:0", type=str, help="运算设备")
     parser.add_argument("--output", default="output/eng-deu", type=str, help="训练结果保存路径")
 
