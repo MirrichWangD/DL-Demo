@@ -157,9 +157,9 @@ class TranslationDataset(Dataset):
         """
 
         Args:
-            file_path: str <src>\t<tgt>\n 一行的txt文件地址
-            src_lang: str 原始数据列索引
-            tgt_lang: str 翻译数据列索引
+            file_path (str): <src>\t<tgt>\n 一行的txt文件地址
+            src_lang (str): 原始数据列索引
+            tgt_lang (str): 翻译数据列索引
         """
         super().__init__()
         self.src_lang = src_lang
@@ -226,10 +226,10 @@ def generate_square_subsequent_mask(sz: int) -> torch.Tensor:
     """
     生成方形后续掩码
     Args:
-        sz: int 生成方形掩码的尺寸
+        sz (int): 生成方形掩码的尺寸
 
     Returns:
-        torch.tensor
+        torch.tensor: 返回对应的掩码方阵
     """
     # 生成倒三角全为 0 的矩阵
     mask = (torch.triu(torch.ones((sz, sz))) == 1).transpose(0, 1)
@@ -242,11 +242,11 @@ def create_mask(src: torch.Tensor, tgt: torch.Tensor) -> object:
     """
     根据 src、tgt 生成 src_mask、tgt_mask、src_padding_mask、tgt_padding_mask
     Args:
-        src: torch.Tensor 输入词索引向量 (S_src, N)
-        tgt: torch.Tensor 输出词索引向量 (S_tgt, N)
+        src (torch.Tensor): 输入词索引向量 (S_src, N)
+        tgt (torch.Tensor): 输出词索引向量 (S_tgt, N)
 
     Returns:
-        Tensor(S_src, S_src), Tensor(S_tgt, S_tgt), Tensor(N, S_src), Tensor(N, S_tgt)
+        torch.Tensor(S_src, S_src), torch.Tensor(S_tgt, S_tgt), torch.Tensor(N, S_src), torch.Tensor(N, S_tgt)
     """
     src_seq_len = src.shape[0]
     tgt_seq_len = tgt.shape[0]
@@ -270,10 +270,10 @@ def collate_fn(batch):
     """
     DataLoader 批获取数据时进行的处理函数
     Args:
-        batch: iter 批数据 (src_token(S_src), tgt_token(S_tgt))
+        batch (iter): 批数据 (src_token(S_src), tgt_token(S_tgt))
 
     Returns:
-        Tensor(S_src, N), Tensor(S_tgt, N)
+        torch.Tensor(S_src, N), torch.Tensor(S_tgt, N)
     """
     src_batch, tgt_batch = [], []
     for src_token, tgt_token in batch:
@@ -294,6 +294,13 @@ class PositionalEncoding(nn.Module):
     """ 位置编码层 """
 
     def __init__(self, emb_size: int, dropout: float, max_len: int = 5000):
+        """
+        位置编码层构造函数
+        Args:
+            emb_size (int): 嵌入维度
+            dropout (float): 线性层 Dropout 比例
+            max_len (int): 最大词长度
+        """
         super(PositionalEncoding, self).__init__()
         den = torch.exp(- torch.arange(0, emb_size, 2) * math.log(10000) / emb_size)
         pos = torch.arange(0, max_len).reshape(max_len, 1)
@@ -314,6 +321,12 @@ class TokenEmbedding(nn.Module):
     """ 词向量嵌入层 """
 
     def __init__(self, vocab_size: int, emb_size):
+        """
+        词嵌入层构造方法
+        Args:
+            vocab_size (int): 词典长度
+            emb_size (int): 嵌入维度
+        """
         super(TokenEmbedding, self).__init__()
         self.embedding = nn.Embedding(vocab_size, emb_size)
         self.emb_size = emb_size
@@ -335,6 +348,18 @@ class Transformer(nn.Module):
                  tgt_vocab_size: int,
                  dim_feedforward: int = 512,
                  dropout: float = 0.1):
+        """
+        Transformer 构造方法
+        Args:
+            num_enc_layers (int): Encoder Block 数量
+            num_dec_layers (int): Decoder Block 数量
+            d_model (int): 词向量维度
+            n_head (int): 多头注意力的头数量
+            src_vocab_size (int): 输入词汇表长度
+            tgt_vocab_size (int): 输出词汇表长度
+            dim_feedforward (int): 前馈网络维度
+            dropout (float): 前馈网络 Dropout 比例
+        """
         super(Transformer, self).__init__()
         self.transformer = nn.Transformer(d_model=d_model,
                                           nhead=n_head,
@@ -383,14 +408,14 @@ def greedy_decode(model: nn.Module,
     """
     预测所使用的贪婪解码算法
     Args:
-        model: torch.nn.Module 模型对象
-        src: torch.Tensor 输入词向量 (S_src, 1)
-        src_mask: torch.Tensor 输入词向量 mask (S_src, S_src)
-        max_len: int 预测最大句子长度，通常时 S_src + 5
-        start_symbol: int 起始符索引，默认为 2
+        model (torch.nn.Module): 模型对象
+        src (torch.Tensor): 输入词向量 (S_src, 1)
+        src_mask (torch.Tensor): 输入词向量 mask (S_src, S_src)
+        max_len (int): 预测最大句子长度，通常时 S_src + 5
+        start_symbol (int): 起始符索引，默认为 2
 
     Returns:
-        Tensor(S_pred, 1)
+        torch.Tensor(S_pred, 1)
     """
     memory = model.encode(src, src_mask)
     ys = torch.ones(1, 1).fill_(start_symbol).type(torch.long).to(src.device)
