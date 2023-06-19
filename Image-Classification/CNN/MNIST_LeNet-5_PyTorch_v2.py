@@ -38,17 +38,19 @@ from tqdm import tqdm  # 进度条
 
 
 def load_data(root, batch_size=4, num_workers=0, valid_split=.2, method="image"):
-    transform = transforms.Compose([
-        transforms.ToTensor(),  # 转换为张量
-        # transforms.Grayscale(num_output_channels=num_channels),  # 转换成灰度单通道图像
-    ])
-
     if method == "image":
         # 采取 ImageFolder 方式读取数据集（该方法可能较慢）
+        transform = transforms.Compose([
+            transforms.ToTensor(),  # 转换为张量
+            transforms.Grayscale(num_output_channels=num_channels),  # 转换成灰度单通道图像
+        ])
         train_data = ImageFolder(root=os.path.join(root, 'train'), transform=transform)
         test_data = ImageFolder(root=os.path.join(root, 'test'), transform=transform)
     elif method == "ubyte":
-        root = root.split("MNIST")[0]
+        transform = transforms.Compose([
+            transforms.ToTensor(),  # 转换为张量
+        ])
+        # root = root.split("MNIST")[0]
         # 采取Torchvision.datasets.MNIST的方式加载数据集
         train_data = MNIST(root=root, train=True, transform=transform)
         test_data = MNIST(root=root, train=False, transform=transform)
@@ -231,7 +233,7 @@ if __name__ == "__main__":
     # 绘图参数
     plt.rcParams['font.sans-serif'] = ['Times New Roman']  # 使用新罗马字体
     # 数据集
-    data_path = r".\data\MNIST"
+    data_path = r"F:\DL-Demo\Computer-Vision\Dataset\Multi-Classification\MNIST\MNIST\images"
     batch_size = 128  # 批次大小
     num_workers = 4  # 读取图片进程数
     valid_split = .0  # 在训练集上划出验证集的尺寸
@@ -253,7 +255,7 @@ if __name__ == "__main__":
     # ---------------- 加载数据和模型 ------------------ #
 
     # 加载数据
-    train_db, test_db = load_data(data_path, batch_size, num_workers, valid_split=valid_split, method="ubyte")
+    train_db, test_db = load_data(data_path, batch_size, num_workers, valid_split=valid_split, method="image")
     # 加载模型
     net = Net()
     torchsummary.summary(net, input_size=(num_channels, *image_size), device="cpu")  # 采用 keras 的方式顺序打印模型结构
