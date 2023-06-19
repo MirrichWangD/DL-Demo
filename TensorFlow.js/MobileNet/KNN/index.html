@@ -1,0 +1,23 @@
+<html>
+<head>
+    <!-- Load the latest version of TensorFlow.js -->
+    <!--  联网模式  -->
+    <!--  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>  -->
+    <!--  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>  -->
+    <!--  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/knn-classifier"></script>  -->
+    <!--  本地模式  -->
+    <script src="js/tfjs.js"></script>
+    <script src="js/mobilenet.js"></script>
+    <script src="js/knn-classifier.js"></script>
+</head>
+<body>
+<div id="console"></div>
+<!-- Add a webcam that we will use to test   -->
+<video autoplay playsinline muted id="webcam" width="224" height="224"></video>
+<button id="class-a">Add A</button>
+<button id="class-b">Add B</button>
+<button id="class-c">Add C</button>
+<!-- Load index.js after the content of the page -->
+<script src="js/index.js"></script>
+</body>
+</html>
