@@ -60,7 +60,7 @@ def load_byte(file, cache=">IIII", dtp=np.uint8):
     """
     iter_num = cache.count("I") * 4
     with open(file, "rb") as f:
-        magic = struct.unpack(cache, f.read(iter_num))
+        _ = struct.unpack(cache, f.read(iter_num))
         data = np.fromfile(f, dtype=dtp)
     return data
 
