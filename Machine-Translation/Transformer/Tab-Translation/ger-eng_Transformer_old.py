@@ -42,7 +42,11 @@ use_cuda = torch.cuda.is_available()
 # 读取平行语料库
 # 英＝法
 <<<<<<< HEAD
+<<<<<<< HEAD
 ger_eng = pd.read_table("data/ger_eng.txt", header=None, sep="\t")
+=======
+ger_eng = pd.read_table('data/ger-eng.txt', header=None, sep='\t')
+>>>>>>> 9b4b9dc88c8d729789a959fbef200dda54996ed5
 =======
 ger_eng = pd.read_table('data/ger-eng.txt', header=None, sep='\t')
 >>>>>>> 9b4b9dc88c8d729789a959fbef200dda54996ed5
