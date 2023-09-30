@@ -11,9 +11,9 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import matplotlib.pyplot as plt
 
-'''+++++++++++++++++++++++++++++
+"""+++++++++++++++++++++++++++++
     @ Settings
-++++++++++++++++++++++++++++++'''
+++++++++++++++++++++++++++++++"""
 
 epochs = 50  # 训练次数
 batch_size = 64  # 训练批次大小
@@ -29,9 +29,9 @@ transformer_units = [
 transformer_layers = 8
 mlp_head_units = [2048, 1024]  # 输出部分的MLP全连接层的大小
 
-'''+++++++++++++++++++++++++++++
+"""+++++++++++++++++++++++++++++
     @ 读取数据
-++++++++++++++++++++++++++++++'''
+++++++++++++++++++++++++++++++"""
 
 # 类别数
 num_classes = 100
@@ -43,9 +43,9 @@ input_shape = (32, 32, 3)
 print(f"x_train 大小: {x_train.shape} - y_train 大小: {y_train.shape}")
 print(f"x_test 大小: {x_test.shape} - y_test 大小: {y_test.shape}")
 
-'''+++++++++++++++++++++++++++++
+"""+++++++++++++++++++++++++++++
     @ 读取数据
-++++++++++++++++++++++++++++++'''
+++++++++++++++++++++++++++++++"""
 learning_rate = 0.001
 weight_decay = 0.0001
 batch_size = 64  # 训练批次大小
@@ -112,9 +112,7 @@ plt.imshow(image.astype("uint8"))
 plt.axis("off")
 plt.show()
 
-resized_image = tf.image.resize(
-    tf.convert_to_tensor([image]), size=(image_size, image_size)
-)
+resized_image = tf.image.resize(tf.convert_to_tensor([image]), size=(image_size, image_size))
 patches = Patches(patch_size)(resized_image)
 print(f"图片大小: {image_size} X {image_size}")
 print(f"切块大小e: {patch_size} X {patch_size}")
@@ -136,9 +134,7 @@ class PatchEncoder(layers.Layer):
         super(PatchEncoder, self).__init__()
         self.num_patches = num_patches
         self.projection = layers.Dense(units=projection_dim)
-        self.position_embedding = layers.Embedding(
-            input_dim=num_patches, output_dim=projection_dim
-        )
+        self.position_embedding = layers.Embedding(input_dim=num_patches, output_dim=projection_dim)
 
     # 这里call后需要定义get_config函数，命名自拟，文章3.9中给出
     def call(self, patch):
@@ -161,9 +157,7 @@ def create_vit_classifier():
         # Layer normalization 1.
         x1 = layers.LayerNormalization(epsilon=1e-6)(encoded_patches)
         # 创建多头自注意力机制 multi-head attention layer，这里经过测试Tensorflow2.5可用
-        attention_output = layers.MultiHeadAttention(
-            num_heads=num_heads, key_dim=projection_dim, dropout=0.1
-        )(x1, x1)
+        attention_output = layers.MultiHeadAttention(num_heads=num_heads, key_dim=projection_dim, dropout=0.1)(x1, x1)
         # Skip connection.
         x2 = layers.Add()([attention_output, encoded_patches])
 
@@ -190,7 +184,7 @@ def create_vit_classifier():
 def run_experiment(model):
     model.compile(
         # 下述可直接替换为  optimizer='adam',
-        optimizer='adam',
+        optimizer="adam",
         loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True),
         metrics=[
             keras.metrics.SparseCategoricalAccuracy(name="accuracy"),

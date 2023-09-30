@@ -48,7 +48,7 @@ def clones(module, num):
 
 
 class PositionalEncoding(nn.Module):
-    """ 实现 Positional Encoding（位置编码）"""
+    """实现 Positional Encoding（位置编码）"""
 
     def __init__(self, d_model, dropout, max_len=5000):
         """
@@ -68,7 +68,7 @@ class PositionalEncoding(nn.Module):
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
-        self.register_buffer('pe', pe)
+        self.register_buffer("pe", pe)
 
     def forward(self, x):
         """
@@ -79,7 +79,7 @@ class PositionalEncoding(nn.Module):
         Returns:
 
         """
-        x = x + Variable(self.pe[:, :x.size(1)], requires_grad=False)
+        x = x + Variable(self.pe[:, : x.size(1)], requires_grad=False)
         return self.dropout(x)
 
 
@@ -107,7 +107,7 @@ def attention(query, key, value, mask=None, dropout=None):
 
 
 class MultiHeadedAttention(nn.Module):
-    """ 多头注意力实现 """
+    """多头注意力实现"""
 
     def __init__(self, h, d_model, dropout=0.1):
         """
@@ -144,8 +144,9 @@ class MultiHeadedAttention(nn.Module):
         nbatches = query.size(0)
 
         # 1) Do all the linear projections in batch from d_model = h * d_k
-        query, key, value = [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
-                             for l, x in zip(self.linears, (query, key, value))]
+        query, key, value = [
+            l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2) for l, x in zip(self.linears, (query, key, value))
+        ]
 
         # 2) Apply attention on all the projected vectors in batch.
         x, self.attn = attention(query, key, value, mask=mask, dropout=self.dropout)
@@ -156,7 +157,7 @@ class MultiHeadedAttention(nn.Module):
 
 
 class LayerNorm(nn.Module):
-    """ 实现层归一化 """
+    """实现层归一化"""
 
     def __init__(self, features, eps=1e-6):
         """
@@ -215,7 +216,7 @@ class SublayerConnection(nn.Module):
 
 
 class PositionwiseFeedForward(nn.Module):
-    """ 实现前馈神经网络层 """
+    """实现前馈神经网络层"""
 
     def __init__(self, d_model, d_ff, dropout=0.1):
         """
@@ -231,12 +232,12 @@ class PositionwiseFeedForward(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        """ 计算 ReLU(X·W_1 + b_1)W_2 + b_2"""
+        """计算 ReLU(X·W_1 + b_1)W_2 + b_2"""
         return self.w_2(self.dropout(F.relu(self.w_1(x))))
 
 
 class EncoderLayer(nn.Module):
-    """ 编码器由自注意（Self-Attention）和前馈（FFN）组成，定义如下 """
+    """编码器由自注意（Self-Attention）和前馈（FFN）组成，定义如下"""
 
     def __init__(self, size, self_attn, feed_forward, dropout):
         """
@@ -254,13 +255,13 @@ class EncoderLayer(nn.Module):
         self.size = size
 
     def forward(self, x, mask):
-        """ 按照原文图 1 进行连接。 """
+        """按照原文图 1 进行连接。"""
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
         return self.sublayer[1](x, self.feed_forward)
 
 
 class Encoder(nn.Module):
-    """ 生成 N 个编码块的编码器 """
+    """生成 N 个编码块的编码器"""
 
     def __init__(self, layer, N):
         """
@@ -274,7 +275,7 @@ class Encoder(nn.Module):
         self.norm = LayerNorm(layer.size)
 
     def forward(self, x, mask):
-        """ 依次在每个层中传递输入 """
+        """依次在每个层中传递输入"""
         for layer in self.layers:
             x = layer(x, mask)
         return self.norm(x)
@@ -290,12 +291,12 @@ def subsequent_mask(size):
 
     """
     attn_shape = (1, size, size)
-    subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype('uint8')
+    subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype("uint8")
     return torch.from_numpy(subsequent_mask) == 0
 
 
 class DecoderLayer(nn.Module):
-    """ 解码器由自注意力（Self-Attention）、编码器的注意力（src-Attention）和前馈网络（FFN）组成 """
+    """解码器由自注意力（Self-Attention）、编码器的注意力（src-Attention）和前馈网络（FFN）组成"""
 
     def __init__(self, size, self_attn, src_attn, feed_forward, dropout):
         """
@@ -315,7 +316,7 @@ class DecoderLayer(nn.Module):
         self.sublayer = clones(SublayerConnection(size, dropout), 3)
 
     def forward(self, x, memory, src_mask, tgt_mask):
-        """ 按照原文图 1 进行连接。 """
+        """按照原文图 1 进行连接。"""
         m = memory
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, tgt_mask))
         x = self.sublayer[1](x, lambda x: self.src_attn(x, m, m, src_mask))
@@ -323,7 +324,7 @@ class DecoderLayer(nn.Module):
 
 
 class Decoder(nn.Module):
-    """ 带掩码操作的 N 层解码块 """
+    """带掩码操作的 N 层解码块"""
 
     def __init__(self, layer, N):
         """
@@ -343,7 +344,7 @@ class Decoder(nn.Module):
 
 
 class Generator(nn.Module):
-    """ 定义标准线性+ softmax生成步骤。 """
+    """定义标准线性+ softmax生成步骤。"""
 
     def __init__(self, d_model, vocab):
         """
@@ -360,7 +361,7 @@ class Generator(nn.Module):
 
 
 class EncoderDecoder(nn.Module):
-    """ 标准的编码器-解码器架构 """
+    """标准的编码器-解码器架构"""
 
     def __init__(self, encoder, decoder, src_embed, tgt_embed, generator):
         """
@@ -381,8 +382,7 @@ class EncoderDecoder(nn.Module):
 
     def forward(self, src, tgt, src_mask, tgt_mask):
         "Take in and process masked src and target sequences."
-        return self.decode(self.encode(src, src_mask), src_mask,
-                           tgt, tgt_mask)
+        return self.decode(self.encode(src, src_mask), src_mask, tgt, tgt_mask)
 
     def encode(self, src, src_mask):
         return self.encoder(self.src_embed(src), src_mask)
@@ -419,7 +419,7 @@ def make_model(src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0
         Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout), N),
         nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
         nn.Sequential(Embeddings(d_model, tgt_vocab), c(position)),
-        Generator(d_model, tgt_vocab)
+        Generator(d_model, tgt_vocab),
     )
     # This was important from their code.
     # Initialize parameters with Glorot / fan_avg.
@@ -469,8 +469,7 @@ class SimpleLossCompute:
 
     def __call__(self, x, y, norm):
         x = self.generator(x)
-        loss = self.criterion(x.contiguous().view(-1, x.size(-1)),
-                              y.contiguous().view(-1)) / norm
+        loss = self.criterion(x.contiguous().view(-1, x.size(-1)), y.contiguous().view(-1)) / norm
         loss.backward()
         if self.opt is not None:
             self.opt.step()
@@ -494,7 +493,7 @@ class NoamOpt:
         self._step += 1
         rate = self.rate()
         for p in self.optimizer.param_groups:
-            p['lr'] = rate
+            p["lr"] = rate
         self._rate = rate
         self.optimizer.step()
 
@@ -502,14 +501,16 @@ class NoamOpt:
         "Implement `lrate` above"
         if step is None:
             step = self._step
-        return self.factor * \
-            (self.model_size ** (-0.5) *
-             min(step ** (-0.5), step * self.warmup ** (-1.5)))
+        return self.factor * (self.model_size ** (-0.5) * min(step ** (-0.5), step * self.warmup ** (-1.5)))
 
 
 def get_std_opt(model):
-    return NoamOpt(model.src_embed[0].d_model, 2, 4000,
-                   torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+    return NoamOpt(
+        model.src_embed[0].d_model,
+        2,
+        4000,
+        torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
+    )
 
 
 def run_epoch(data_iter, model, loss_compute):
@@ -528,8 +529,7 @@ def run_epoch(data_iter, model, loss_compute):
         tokens += batch.ntokens
         if i % 50 == 1:
             elapsed = time.time() - start
-            print("Epoch Step: %d Loss: %f Tokens per Sec: %f" %
-                  (i, loss / batch.ntokens, tokens / elapsed))
+            print("Epoch Step: %d Loss: %f Tokens per Sec: %f" % (i, loss / batch.ntokens, tokens / elapsed))
             start = time.time()
             tokens = 0
     return total_loss / total_tokens
@@ -539,11 +539,11 @@ def run_epoch(data_iter, model, loss_compute):
 
 
 def Traditional2Simplified(sentence):
-    '''
+    """
     将sentence中的繁体字转为简体字
     :param sentence: 待转换的句子
     :return: 将句子中繁体字转换为简体字之后的句子
-    '''
+    """
     cc = opencc.OpenCC("t2s")
     sentence = cc.convert(sentence)
     return sentence
@@ -574,7 +574,7 @@ def load_data(filename, max_len=5000):
     file = open(filename, encoding="utf-8")
     src_word, tgt_word = [], []
     for line in file:
-        src_sent, tgt_sent = line.rstrip("\n").split('\t')[:2]
+        src_sent, tgt_sent = line.rstrip("\n").split("\t")[:2]
         tgt_sent = Traditional2Simplified(tgt_sent)
         src_word.append(" ".join(nltk.word_tokenize(src_sent)).split())
         tgt_word.append(" ".join(tgt_sent).split())
@@ -589,11 +589,11 @@ def load_data(filename, max_len=5000):
 
     src = torch.tensor(
         batch_padding([[1] + [src_token_map[i] for i in line] + [2] for line in src_word], max_len),
-        dtype=torch.int
+        dtype=torch.int,
     )
     tgt = torch.tensor(
         batch_padding([[1] + [tgt_token_map[i] for i in line] + [2] for line in tgt_word], max_len),
-        dtype=torch.int
+        dtype=torch.int,
     )
 
     return src, tgt, src_token_map, tgt_token_map
@@ -608,17 +608,14 @@ class Batch:
         if trg is not None:
             self.trg = trg[:, :-1]
             self.trg_y = trg[:, 1:]
-            self.trg_mask = \
-                self.make_std_mask(self.trg, pad)
+            self.trg_mask = self.make_std_mask(self.trg, pad)
             self.ntokens = (self.trg_y != pad).data.sum()
 
     @staticmethod
     def make_std_mask(tgt, pad):
         "Create a mask to hide padding and future words."
         tgt_mask = (tgt != pad).unsqueeze(-2)
-        tgt_mask = tgt_mask & Variable(
-            subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data)
-        )
+        tgt_mask = tgt_mask & Variable(subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data))
         return tgt_mask
 
 
@@ -655,9 +652,12 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol):
     # ys代表目前已生成的序列，最初为仅包含一个起始符的序列，不断将预测结果追加到序列最后
     ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
     for i in range(max_len - 1):
-        out = model.decode(memory, src_mask,
-                           Variable(ys),
-                           Variable(subsequent_mask(ys.size(1)).type_as(src.data)))
+        out = model.decode(
+            memory,
+            src_mask,
+            Variable(ys),
+            Variable(subsequent_mask(ys.size(1)).type_as(src.data)),
+        )
         prob = model.generator(out[:, -1])
         _, next_word = torch.max(prob, dim=1)
         next_word = next_word.data[0]
@@ -692,8 +692,8 @@ if __name__ == "__main__":
     np.random.seed(666)
     indices = np.arange(0, src.shape[0])
     np.random.shuffle(indices)
-    train_indices = indices[:int(.99 * src.shape[0])]
-    val_indices = indices[int(.99 * src.shape[0]):]
+    train_indices = indices[: int(0.99 * src.shape[0])]
+    val_indices = indices[int(0.99 * src.shape[0]) :]
     train_src = src[train_indices]
     train_tgt = tgt[train_indices]
     val_src = src[val_indices]
@@ -713,8 +713,12 @@ if __name__ == "__main__":
 
     criterion = LabelSmoothing(size=vocab_zh, padding_idx=0, smoothing=0.0)
     model = make_model(vocab_en, vocab_zh)
-    model_opt = NoamOpt(model.src_embed[0].d_model, 1, 400,
-                        torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+    model_opt = NoamOpt(
+        model.src_embed[0].d_model,
+        1,
+        400,
+        torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
+    )
 
     if cuda:
         model.cuda()

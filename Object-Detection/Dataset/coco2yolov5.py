@@ -43,7 +43,7 @@ def load_json(file):
         dict
 
     """
-    with open(file, 'r') as f:
+    with open(file, "r") as f:
         data = json.load(f)
     return data
 
@@ -95,9 +95,88 @@ raw_files = "raw"  # 存放原始文件目录
 years = ["2014", "2017"]  # 数据集年份
 splits = ["train", "val"]  # 数据集划分
 # 制作标签映射，COCO数据集中标签索引非连续
-label_idx = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 27, 28, 31, 32, 33,
-             34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61,
-             62, 63, 64, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 84, 85, 86, 87, 88, 89, 90]
+label_idx = [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    27,
+    28,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    67,
+    70,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+]
 col_map = dict(zip(label_idx, range(len(label_idx))))
 
 """
@@ -115,13 +194,18 @@ for year in years:
         # 获取当前年份和子集的图片信息，id和图片名字
         images = pd.DataFrame(instances["images"])[["id", "file_name", "height", "width"]]
         # 获取标注信息，图片id、标签id和标注框
-        annotation = pd.DataFrame(instances['annotations'])[["image_id", "category_id", "bbox"]]
-        categories = pd.DataFrame(instances['categories'])
+        annotation = pd.DataFrame(instances["annotations"])[["image_id", "category_id", "bbox"]]
+        categories = pd.DataFrame(instances["categories"])
         if not os.path.exists(os.path.join(save_dir, "COCO_Categories.csv")):
             categories.to_csv(os.path.join(save_dir, "COCO_categories.csv"), index=False)
         for img_id, img_name, H, W in tqdm(images.values, total=len(images), desc=split + year):
             # 获取对应图片产生的txt文件完整路径
-            txt_file = os.path.join(save_dir, "labels", f"{split}{year}", os.path.splitext(img_name)[0] + ".txt")
+            txt_file = os.path.join(
+                save_dir,
+                "labels",
+                f"{split}{year}",
+                os.path.splitext(img_name)[0] + ".txt",
+            )
             # if os.path.exists(txt_file):
             #     continue
             bbox = annotation[annotation["image_id"] == img_id]["bbox"]  # 获取指定图片的标注信息

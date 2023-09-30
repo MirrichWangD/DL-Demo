@@ -39,27 +39,21 @@ val_indices = indices[20:]
 """
 
 # COCO 格式的licenses、info键内容
-licenses = [
-    {
-        "name": "",
-        "id": 0,
-        "url": ""
-    }
-]
+licenses = [{"name": "", "id": 0, "url": ""}]
 info = {
     "contributor": "",
     "date_created": "",
     "description": "",
     "url": "",
     "version": "",
-    "year": ""
+    "year": "",
 }
 
 root_dir = Path(r"E:\Documents\datasets\ShanDong\ppdet")
 output_dir = Path(r"E:\Documents\datasets\ShanDong\ppdet\demo_data_v3")
 raw_dir = root_dir / "raw"
 subset = ["train", "val"]  # 子集划分
-train_size = .9  # 训练集比例
+train_size = 0.9  # 训练集比例
 width = 3  # 图片名字长度
 
 # 创建输出目录的相关文件夹
@@ -74,19 +68,18 @@ for s in subset:
 # 标签处理
 labels_dirs = ["police", "weapon", "qiang", "tanke"]  # 图片和Label.txt文件夹
 label_nums = [-1, -1, -1, -1]  # -1表示选取全部图片
-label_names = list(map(
-    lambda i: i.strip().split("\t")[0], open(root_dir / "label_names.txt", encoding="utf-8").readlines())
+label_names = list(
+    map(
+        lambda i: i.strip().split("\t")[0],
+        open(root_dir / "label_names.txt", encoding="utf-8").readlines(),
+    )
 )  # 读取标签
 label_dict = dict(zip(label_names, range(1, len(label_names) + 1)))  # 标签->ID
 
 # 生成COCO格式的"categories"键内容
 categories = []
 for name, id in label_dict.items():
-    categories.append({
-        "id": id,
-        "name": name,
-        "supercategory": ""
-    })
+    categories.append({"id": id, "name": name, "supercategory": ""})
 print(categories)
 
 """
@@ -116,17 +109,19 @@ for label_num, label in zip(label_nums, labels_dirs):
         img = Image.open(root_dir / "raw" / file_path)
         w, h = img.size
 
-        images.append({
-            "id": image_id,
-            "width": w,
-            "height": h,
-            "file_name": file_name,
-            "raw_file_name": os.path.basename(file_path),  # 原始图片路径
-            "license": 0,
-            "flickr_url": "",
-            "coco_url": "",
-            "data_captured": 0
-        })
+        images.append(
+            {
+                "id": image_id,
+                "width": w,
+                "height": h,
+                "file_name": file_name,
+                "raw_file_name": os.path.basename(file_path),  # 原始图片路径
+                "license": 0,
+                "flickr_url": "",
+                "coco_url": "",
+                "data_captured": 0,
+            }
+        )
         for gt in gts:
             id += 1
             # 获取标注信息
@@ -136,15 +131,17 @@ for label_num, label in zip(label_nums, labels_dirs):
             y_min, y_max = points[:, 1].min(), points[:, 1].max()
             bbox = [int(x_min), int(y_min), int(x_max - x_min), int(y_max - y_min)]
 
-            annotations.append({
-                "id": id,
-                "image_id": image_id,
-                "category_id": label_dict[category],
-                "area": bbox[2] * bbox[3],
-                "bbox": bbox,
-                "iscrowd": 0,
-                "attributes": {"occluded": False, "rotation": 0.}
-            })
+            annotations.append(
+                {
+                    "id": id,
+                    "image_id": image_id,
+                    "category_id": label_dict[category],
+                    "area": bbox[2] * bbox[3],
+                    "bbox": bbox,
+                    "iscrowd": 0,
+                    "attributes": {"occluded": False, "rotation": 0.0},
+                }
+            )
 print(total)
 
 # 读取二维码图片的json标注
@@ -157,17 +154,19 @@ for i, anno_file in enumerate((root_dir / "raw/qr").glob("*.json")):
     file_name = f"qr_{i + 1}.jpg"
     img = Image.open(root_dir / "raw/qr" / file_path)
     h, w = gt["imageHeight"], gt["imageWidth"]
-    images.append({
-        "id": image_id,
-        "width": w,
-        "height": h,
-        "file_name": file_name,
-        "raw_file_name": file_path,
-        "license": 0,
-        "flickr_url": "",
-        "coco_url": "",
-        "date_captured": 0
-    })
+    images.append(
+        {
+            "id": image_id,
+            "width": w,
+            "height": h,
+            "file_name": file_name,
+            "raw_file_name": file_path,
+            "license": 0,
+            "flickr_url": "",
+            "coco_url": "",
+            "date_captured": 0,
+        }
+    )
     for anno in gt["shapes"]:
         id += 1
         category = anno["label"].lower()
@@ -175,16 +174,18 @@ for i, anno_file in enumerate((root_dir / "raw/qr").glob("*.json")):
         x_min, y_min = points[0]
         x_max, y_max = points[1]
         bbox = [int(x_min), int(y_min), int(x_max - x_min), int(y_max - y_min)]
-        annotations.append({
-            "id": id,
-            "image_id": image_id,
-            "category_id": label_dict[category],
-            "segmentations": [],
-            "area": bbox[-1] * bbox[-2],
-            "bbox": bbox,
-            "iscrowd": 0,
-            "attributes": {"occluded": False, "rotation": 0.}
-        })
+        annotations.append(
+            {
+                "id": id,
+                "image_id": image_id,
+                "category_id": label_dict[category],
+                "segmentations": [],
+                "area": bbox[-1] * bbox[-2],
+                "bbox": bbox,
+                "iscrowd": 0,
+                "attributes": {"occluded": False, "rotation": 0.0},
+            }
+        )
 
 """
 ==================
@@ -194,16 +195,24 @@ for i, anno_file in enumerate((root_dir / "raw/qr").glob("*.json")):
 
 indices = np.arange(0, len(images))
 np.random.shuffle(indices)
-train_indices = indices[:int(.9 * len(indices))]
-val_indices = indices[int(.9 * len(indices)):]
+train_indices = indices[: int(0.9 * len(indices))]
+val_indices = indices[int(0.9 * len(indices)) :]
 
-result = dict(zip(subset, [{
-    "licenses": licenses,
-    "info": info,
-    "categories": categories,
-    "images": [],
-    "annotations": []
-} for _ in range(len(subset))]))
+result = dict(
+    zip(
+        subset,
+        [
+            {
+                "licenses": licenses,
+                "info": info,
+                "categories": categories,
+                "images": [],
+                "annotations": [],
+            }
+            for _ in range(len(subset))
+        ],
+    )
+)
 
 for idx in indices:
     image = images[idx]
@@ -243,7 +252,11 @@ for s in subset:
             if anno["image_id"] == image["id"]:
                 color = tuple(np.random.randint(0, 256, 3))
                 x, y, w, h = anno["bbox"]
-                img_draw.line([(x, y), (x + w, y), (x + w, y + h), (x, y + h), (x, y)], fill=color, width=2)
+                img_draw.line(
+                    [(x, y), (x + w, y), (x + w, y + h), (x, y + h), (x, y)],
+                    fill=color,
+                    width=2,
+                )
         img.save(output_dir / "visualize" / image["file_name"])
         # break
     # break

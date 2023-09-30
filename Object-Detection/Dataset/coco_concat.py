@@ -22,7 +22,14 @@ from PIL import Image
 
 # COCO相关基础变量
 licenses = [{"name": "", "id": 0, "url": ""}]
-info = {"contributor": "", "date_created": "", "description": "", "url": "", "version": "", "year": ""}
+info = {
+    "contributor": "",
+    "date_created": "",
+    "description": "",
+    "url": "",
+    "version": "",
+    "year": "",
+}
 # 随机种子
 np.random.seed(666)
 
@@ -42,8 +49,18 @@ output_dir = "demo_data_v6"
 
 # 需要拼接的文件夹名字和子集
 new_dirs = [
-    {"new_dir": "demo_smoke", "subset": ["train2017", "val2017"], "num": [-1, -1], "shuffle": True},
-    {"new_dir": "demo_logo", "subset": ["train2017", "val2017"], "num": [2000, 500], "shuffle": True},
+    {
+        "new_dir": "demo_smoke",
+        "subset": ["train2017", "val2017"],
+        "num": [-1, -1],
+        "shuffle": True,
+    },
+    {
+        "new_dir": "demo_logo",
+        "subset": ["train2017", "val2017"],
+        "num": [2000, 500],
+        "shuffle": True,
+    },
 ]
 
 # 集合名字

@@ -45,9 +45,9 @@ with tqdm(total=len(files)) as pbar:
         dom = xml.dom.minidom.parse(str(file))
         # 得到文档元素对象
         root = dom.documentElement
-        path = os.path.basename(root.getElementsByTagName('path')[0].firstChild.data)
+        path = os.path.basename(root.getElementsByTagName("path")[0].firstChild.data)
         # 获取目标物体
-        data = root.getElementsByTagName('item')
+        data = root.getElementsByTagName("item")
         try:
             img = Image.open(root_dir / path).convert("RGB")
             img_draw = ImageDraw.Draw(img)
@@ -55,12 +55,12 @@ with tqdm(total=len(files)) as pbar:
             continue
         for doc in data:
             # 获取标签
-            label = doc.getElementsByTagName('name')[0].firstChild.data
+            label = doc.getElementsByTagName("name")[0].firstChild.data
             # 获取左上角、右下角坐标
-            x1 = float(doc.getElementsByTagName('xmin')[0].firstChild.data)
-            y1 = float(doc.getElementsByTagName('ymin')[0].firstChild.data)
-            x2 = float(doc.getElementsByTagName('xmax')[0].firstChild.data)
-            y2 = float(doc.getElementsByTagName('ymax')[0].firstChild.data)
+            x1 = float(doc.getElementsByTagName("xmin")[0].firstChild.data)
+            y1 = float(doc.getElementsByTagName("ymin")[0].firstChild.data)
+            x2 = float(doc.getElementsByTagName("xmax")[0].firstChild.data)
+            y2 = float(doc.getElementsByTagName("ymax")[0].firstChild.data)
 
             color = tuple(np.random.randint(0, 256, 3, dtype=np.uint8).tolist())
             img_draw.rectangle((x1, y1, x2, y2), outline=color, width=2)

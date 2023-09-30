@@ -24,7 +24,7 @@ from PIL import Image
 
 
 def get_md5(file):
-    """ 获取文件md5码 """
+    """获取文件md5码"""
     with open(file, "rb") as f:
         md5 = hashlib.md5(f.read())
     md5_values = md5.hexdigest()

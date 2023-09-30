@@ -20,7 +20,6 @@ version = "5.1.1"  # labelme 版本
 label_dirs = ["police", "gun", "chariot", "weapon"]
 
 for label_dir in label_dirs:
-
     root_dir = Path(rf"E:\Documents\datasets\ShanDong\ppdet\raw\{label_dir}")
 
     (root_dir / "labels").mkdir(exist_ok=True)
@@ -37,24 +36,31 @@ for label_dir in label_dirs:
             points = np.array(anno["points"])
             x_min, x_max = points[:, 0].min(), points[:, 0].max()
             y_min, y_max = points[:, 1].min(), points[:, 1].max()
-            shapes.append({
-                "label": anno["transcription"],
-                "points": [
-                    [float(x_min), float(y_min)],
-                    [float(x_max), float(y_max)]
-                ],
-                "group_id": None,
-                "shape_type": "rectangle",
-                "flags": {}
-            })
+            shapes.append(
+                {
+                    "label": anno["transcription"],
+                    "points": [
+                        [float(x_min), float(y_min)],
+                        [float(x_max), float(y_max)],
+                    ],
+                    "group_id": None,
+                    "shape_type": "rectangle",
+                    "flags": {},
+                }
+            )
         with open(root_dir / "labels" / f"{file_name}.json", "w+", encoding="utf-8") as f:
-            json.dump({
-                "version": version,
-                "flags": {},
-                "shapes": shapes,
-                "imagePath": os.path.join("../../../../../scripts", f"{file_name}.jpg"),
-                "imageData": None,
-                "imageHeight": h,
-                "imageWidth": w
-            }, f, indent=4, ensure_ascii=False)
+            json.dump(
+                {
+                    "version": version,
+                    "flags": {},
+                    "shapes": shapes,
+                    "imagePath": os.path.join("../../../../../scripts", f"{file_name}.jpg"),
+                    "imageData": None,
+                    "imageHeight": h,
+                    "imageWidth": w,
+                },
+                f,
+                indent=4,
+                ensure_ascii=False,
+            )
         # break

@@ -20,6 +20,7 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+
 # 导入Paddle相关库
 from paddle.vision import RandomRotation, RandomHorizontalFlip, CenterCrop, Normalize
 import paddle
@@ -109,17 +110,17 @@ class MyNet(paddle.nn.Layer):
         super(MyNet, self).__init__()
         self.num_classes = num_classes
 
-        self.features = nn.Sequential(nn.Conv2D(1, 6, 3, stride=1, padding=1),
-                                      nn.ReLU(),
-                                      nn.MaxPool2D(2, 2),
-                                      nn.Conv2D(6, 16, 5, stride=1, padding=0),
-                                      nn.ReLU(),
-                                      nn.MaxPool2D(2, 2))
+        self.features = nn.Sequential(
+            nn.Conv2D(1, 6, 3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2D(2, 2),
+            nn.Conv2D(6, 16, 5, stride=1, padding=0),
+            nn.ReLU(),
+            nn.MaxPool2D(2, 2),
+        )
 
         if self.num_classes > 0:
-            self.head = paddle.nn.Sequential(nn.Linear(400, 120),
-                                             nn.Linear(120, 84),
-                                             nn.Linear(84, self.num_classes))
+            self.head = paddle.nn.Sequential(nn.Linear(400, 120), nn.Linear(120, 84), nn.Linear(84, self.num_classes))
 
     def forward(self, inputs):
         x = self.features(inputs)
@@ -142,7 +143,7 @@ model = nn.Sequential(
     nn.Flatten(),
     nn.Linear(400, 120),
     nn.Linear(120, 84),
-    nn.Linear(84, 10)
+    nn.Linear(84, 10),
 )
 
 """
@@ -206,7 +207,12 @@ if __name__ == "__main__":
                         train_history["loss_test"][-1].append(loss.item())
                         train_history["acc_test"][-1].append(acc.item())
                         pbar1.update(1)
-                        pbar1.set_postfix({"acc_test": f"{acc.item():.4f}", "loss_test": f"{loss.item():.4f}"})
+                        pbar1.set_postfix(
+                            {
+                                "acc_test": f"{acc.item():.4f}",
+                                "loss_test": f"{loss.item():.4f}",
+                            }
+                        )
 
                     if np.mean(train_history["acc_test"][-1]) > np.mean(acc_max):
                         paddle.save(model.state_dict(), str(save_dir / "best_model.pdparams"))

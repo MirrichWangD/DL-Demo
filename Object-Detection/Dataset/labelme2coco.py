@@ -25,24 +25,18 @@ from PIL import Image
 """
 
 # COCO 格式的licenses、info键内容
-licenses = [
-    {
-        "name": "",
-        "id": 0,
-        "url": ""
-    }
-]
+licenses = [{"name": "", "id": 0, "url": ""}]
 info = {
     "contributor": "",
     "date_created": "",
     "description": "",
     "url": "",
     "version": "",
-    "year": ""
+    "year": "",
 }
 
 subset = ["train", "val"]
-train_size = .9
+train_size = 0.9
 
 # 设置根目录和输出目录文件夹
 root_dir = r"E:\Documents\datasets\sdznsh\ppdet\raw"
@@ -57,10 +51,23 @@ output_dir.mkdir(exist_ok=True)
 for s in subset:
     (output_dir / s).mkdir(exist_ok=True)
 
-labels_dirs = ["bazooka", "police", "chariot", "gun", "knife", "pistol", "grenade", "warcraft", "warship"]
+labels_dirs = [
+    "bazooka",
+    "police",
+    "chariot",
+    "gun",
+    "knife",
+    "pistol",
+    "grenade",
+    "warcraft",
+    "warship",
+]
 label_nums = [-1, -1, -1, -1, -1, -1, -1, -1, -1]
-label_names = list(map(
-    lambda i: i.strip().split("\t")[0], open(root_dir / ".." / "label_names.txt", encoding="utf-8").readlines())
+label_names = list(
+    map(
+        lambda i: i.strip().split("\t")[0],
+        open(root_dir / ".." / "label_names.txt", encoding="utf-8").readlines(),
+    )
 )  # 读取标签
 label_dict = dict(zip(sorted(label_names), range(1, len(label_names) + 1)))  # 标签->ID
 
@@ -69,11 +76,7 @@ print("[INFO] Categories:")
 categories = []
 for name, id in label_dict.items():
     print(f"{id} - {name}")
-    categories.append({
-        "id": id,
-        "name": name,
-        "supercategory": ""
-    })
+    categories.append({"id": id, "name": name, "supercategory": ""})
 
 """
 ==================
@@ -93,8 +96,8 @@ for label_num, label_dir in zip(label_nums, labels_dirs):
 
     indices = np.arange(0, num)
     np.random.shuffle(indices)
-    train_indices = indices[:int(train_size * num)]
-    val_indices = indices[int(train_size * num):]
+    train_indices = indices[: int(train_size * num)]
+    val_indices = indices[int(train_size * num) :]
     print(f"[INFO] {label_dir} Train: {train_indices.shape[0]}, Val: {val_indices.shape[0]}")
 
     for i, file in enumerate(label_files):
@@ -118,7 +121,7 @@ for label_num, label_dir in zip(label_nums, labels_dirs):
             "license": 0,
             "flickr_url": "",
             "coco_url": "",
-            "data_captured": 0
+            "data_captured": 0,
         }
 
         anns = []
@@ -129,15 +132,17 @@ for label_num, label_dir in zip(label_nums, labels_dirs):
             x_min, x_max = points[:, 0].min(), points[:, 0].max()
             y_min, y_max = points[:, 1].min(), points[:, 1].max()
             bbox = [int(x_min), int(y_min), int(x_max - x_min), int(y_max - y_min)]
-            anns.append({
-                "id": id,
-                "image_id": image_id,
-                "category_id": label_dict[category],
-                "area": bbox[2] * bbox[3],
-                "bbox": bbox,
-                "iscrowd": 0,
-                "attributes": {"occluded": False, "rotation": 0.}
-            })
+            anns.append(
+                {
+                    "id": id,
+                    "image_id": image_id,
+                    "category_id": label_dict[category],
+                    "area": bbox[2] * bbox[3],
+                    "bbox": bbox,
+                    "iscrowd": 0,
+                    "attributes": {"occluded": False, "rotation": 0.0},
+                }
+            )
 
         if i in train_indices:
             img.save(output_dir / "train" / file_name)
@@ -157,10 +162,15 @@ for label_num, label_dir in zip(label_nums, labels_dirs):
 
 for s in subset:
     with open(output_dir / f"annotations/instances_{s}.json", "w+", encoding="utf-8") as f:
-        json.dump({
-            "licenses": licenses,
-            "info": info,
-            "categories": categories,
-            "images": images[s],
-            "annotations": annotations[s]
-        }, f, indent=4, ensure_ascii=False)
+        json.dump(
+            {
+                "licenses": licenses,
+                "info": info,
+                "categories": categories,
+                "images": images[s],
+                "annotations": annotations[s],
+            },
+            f,
+            indent=4,
+            ensure_ascii=False,
+        )

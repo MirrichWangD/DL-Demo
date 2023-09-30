@@ -59,7 +59,12 @@ for s in subset:
     fig, ax = plt.subplots(figsize=(8, 7))
     sns.countplot(x="category_id", data=pd.DataFrame(annotations))
     for p in ax.patches:
-        ax.annotate(f'\n{p.get_height():.0f}', (p.get_x()+.2, p.get_height() + 8), color='black', size=8)
+        ax.annotate(
+            f"\n{p.get_height():.0f}",
+            (p.get_x() + 0.2, p.get_height() + 8),
+            color="black",
+            size=8,
+        )
     plt.title(f"{root.name} - {s}")
     plt.xticks(range(len(label_idx)), list(label_idx.values()), rotation=15)
     plt.savefig(root / f"visualize/{s}.jpg")

@@ -76,10 +76,10 @@ def xyxy2xywh(w, h, x1, y1, x2, y2):
 =====================
 """
 
-train_size = .8  # 训练集比例
-root = r'F:\DeepLearning\Object-Detection (目标检测)\data\RSOD'  # 数据集根目录
+train_size = 0.8  # 训练集比例
+root = r"F:\DeepLearning\Object-Detection (目标检测)\data\RSOD"  # 数据集根目录
 raw_file = "raw"  # 存放解压源文件的目录，若为根目录填"."
-splits = ['train', 'val', 'test']  # 子集
+splits = ["train", "val", "test"]  # 子集
 label_names = ["aircraft", "oiltank", "overpass", "playground"]  # 类别名字
 pd.DataFrame(label_names).to_csv(os.path.join(root, "RSOD_Categories.csv"), index=False)
 class_to_idx = dict(zip(label_names, range(len(label_names))))
@@ -101,8 +101,8 @@ test_files = list(set(img_files) - set(txt_files))
 N = len(txt_files)
 indices = np.arange(len(txt_files))
 np.random.shuffle(indices)  # 打乱原始索引
-train_indices = indices[:int(N * train_size)]
-valid_indices = indices[int(N * train_size):]
+train_indices = indices[: int(N * train_size)]
+valid_indices = indices[int(N * train_size) :]
 # 获取文件名
 train_files = list(map(lambda i: txt_files[i], train_indices))
 valid_files = list(map(lambda i: txt_files[i], valid_indices))
@@ -117,26 +117,33 @@ files = dict(zip(splits, [train_files, valid_files, test_files]))
 
 for split in splits:
     # 创建子集文件夹
-    os.makedirs(os.path.join(root, 'images', split))
+    os.makedirs(os.path.join(root, "images", split))
     if split != "test":
-        os.makedirs(os.path.join(root, 'labels', split))
+        os.makedirs(os.path.join(root, "labels", split))
         os.makedirs(os.path.join(root, "annotations", split))
     for i, file in tqdm(enumerate(files[split]), total=len(files[split]), desc=split.title()):
         label = file.split("_")[0]  # 获取标签名字
         # 读取图片
-        img = Image.open(os.path.join(root, raw_file, label, 'JPEGImages', file + '.jpg'))
+        img = Image.open(os.path.join(root, raw_file, label, "JPEGImages", file + ".jpg"))
         # 判断是否为测试集，若为测试集则不读取标注文件
         if split != "test":
             # 读取 xml 文件并另存为
             xml_file = open(os.path.join(root, raw_file, label, "Annotation", "xml", f"{file}.xml"))
             open(os.path.join(root, "annotations", split, f"{file}.xml"), "w+").write(xml_file.read())
             # 读取 txt 文件
-            anno = pd.read_table(os.path.join(root, raw_file, label, r'Annotation\labels', f'{file}.txt'), header=None)
+            anno = pd.read_table(
+                os.path.join(root, raw_file, label, r"Annotation\labels", f"{file}.txt"),
+                header=None,
+            )
             # 将字符串类别名字转换成索引
             labels = list(map(lambda i: class_to_idx[i], anno[1]))
             bboxes = anno.values[:, 2:]
             new_bboxes = pd.DataFrame([[j, *xyxy2xywh(*img.size, *bbox)] for j, bbox in zip(labels, bboxes)])
             # 保存 YOLOv5 格式标注和图片
-            new_bboxes.to_csv(os.path.join(root, 'labels', split, f'{file}.txt'), sep='\t', index=False, header=False)
-        img.save(os.path.join(root, 'images', split, f'{file}.jpg'))
-
+            new_bboxes.to_csv(
+                os.path.join(root, "labels", split, f"{file}.txt"),
+                sep="\t",
+                index=False,
+                header=False,
+            )
+        img.save(os.path.join(root, "images", split, f"{file}.jpg"))

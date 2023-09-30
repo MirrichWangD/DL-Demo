@@ -43,18 +43,18 @@ PAD_ID = 3
 def read_file(json_path):
     english_sentences = []
     chinese_sentences = []
-    tokenizer = get_tokenizer('basic_english')
-    with open(json_path, 'r', encoding="utf-8") as fp:
+    tokenizer = get_tokenizer("basic_english")
+    with open(json_path, "r", encoding="utf-8") as fp:
         for line in fp:
             line = json.loads(line)
-            english, chinese = line['english'], line['chinese']
+            english, chinese = line["english"], line["chinese"]
             # Correct mislabeled data
             if not english.isascii():
                 english, chinese = chinese, english
             # Tokenize
             english = tokenizer(english)
             chinese = list(jieba.cut(chinese))
-            chinese = [x for x in chinese if x not in {' ', '\t'}]
+            chinese = [x for x in chinese if x not in {" ", "\t"}]
             english_sentences.append(english)
             chinese_sentences.append(chinese)
     return english_sentences, chinese_sentences
@@ -63,7 +63,7 @@ def read_file(json_path):
 def create_vocab(sentences, max_element=None):
     """Note that max_element includes special characters"""
 
-    default_list = ['<sos>', '<eos>', '<unk>', '<pad>']
+    default_list = ["<sos>", "<eos>", "<unk>", "<pad>"]
 
     char_set = Counter()
     for sentence in sentences:
@@ -95,13 +95,13 @@ def sentence_to_tensor(sentences, vocab):
 
 
 def tensor_to_sentence(tensor, mapping, insert_space=False):
-    res = ''
+    res = ""
     first_word = True
     for id in tensor:
         word = mapping[int(id.item())]
 
         if insert_space and not first_word:
-            res += ' '
+            res += " "
         first_word = False
 
         res += word
@@ -110,8 +110,7 @@ def tensor_to_sentence(tensor, mapping, insert_space=False):
 
 
 def main():
-    en_sens, zh_sens = read_file(
-        'data/translation2019zh_valid.json')
+    en_sens, zh_sens = read_file("data/translation2019zh_valid.json")
     print(*en_sens[0:3])
     print(*zh_sens[0:3])
     en_vocab = create_vocab(en_sens, 10000)
@@ -139,5 +138,5 @@ def main():
     #                      allow_pickle=True)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

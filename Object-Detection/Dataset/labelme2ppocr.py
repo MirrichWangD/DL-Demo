@@ -30,14 +30,18 @@ for i, anno_file in enumerate(anno_dir.glob("*.json")):
     annos = []
     for gt in gts["shapes"]:
         pt1, pt2 = gt["points"]
-        annos.append({
-            "transcription": "qr",
-            "points": [[int(pt1[0]), int(pt1[1])],
-                       [int(pt2[0]), int(pt1[1])],
-                       [int(pt2[0]), int(pt2[1])],
-                       [int(pt1[0]), int(pt2[1])]],
-            "difficult": "false",
-        })
+        annos.append(
+            {
+                "transcription": "qr",
+                "points": [
+                    [int(pt1[0]), int(pt1[1])],
+                    [int(pt2[0]), int(pt1[1])],
+                    [int(pt2[0]), int(pt2[1])],
+                    [int(pt1[0]), int(pt2[1])],
+                ],
+                "difficult": "false",
+            }
+        )
     result.append(f"qr/{file_name}\t{json.dumps(annos)}\n")
 
 with open(root_dir / "Label.txt", "w+", encoding="utf-8") as f:

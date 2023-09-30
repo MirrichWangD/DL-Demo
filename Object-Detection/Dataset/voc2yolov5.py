@@ -83,20 +83,20 @@ def xml2txt(file, label_names):
     dom = xml.dom.minidom.parse(file)
     # 得到文档元素对象
     root = dom.documentElement
-    name = root.getElementsByTagName('filename')[0].firstChild.data.split(".")[0]
-    w = root.getElementsByTagName('width')[0].firstChild.data.split(".")[0]
-    h = root.getElementsByTagName('height')[0].firstChild.data.split(".")[0]
+    name = root.getElementsByTagName("filename")[0].firstChild.data.split(".")[0]
+    w = root.getElementsByTagName("width")[0].firstChild.data.split(".")[0]
+    h = root.getElementsByTagName("height")[0].firstChild.data.split(".")[0]
 
     class_to_ind = dict(zip(label_names, range(len(label_names))))
 
-    data = root.getElementsByTagName('object')
+    data = root.getElementsByTagName("object")
     new = []
     for doc in data:
-        sens = doc.getElementsByTagName('name')[0].firstChild.data
-        xmin = doc.getElementsByTagName('xmin')[0].firstChild.data
-        ymin = doc.getElementsByTagName('ymin')[0].firstChild.data
-        xmax = doc.getElementsByTagName('xmax')[0].firstChild.data
-        ymax = doc.getElementsByTagName('ymax')[0].firstChild.data
+        sens = doc.getElementsByTagName("name")[0].firstChild.data
+        xmin = doc.getElementsByTagName("xmin")[0].firstChild.data
+        ymin = doc.getElementsByTagName("ymin")[0].firstChild.data
+        xmax = doc.getElementsByTagName("xmax")[0].firstChild.data
+        ymax = doc.getElementsByTagName("ymax")[0].firstChild.data
         xywh = xyxy2xywh(float(w), float(h), float(xmin), float(ymin), float(xmax), float(ymax))
         new.append([class_to_ind[sens], xywh[0], xywh[1], xywh[2], xywh[3]])
     return new
@@ -114,8 +114,28 @@ root = r"G:\datasets\VOC"  # 数据集根目录
 save_dir = r"G:\Object-Detection (目标检测)\data\VOC"  # 保存YOLOv5标注目录
 raw_file = r"raw\VOCdevkit"  # 存放源文件解压后目录
 # VOC 的 20 类标签
-label_names = ["aeroplane", "bicycle", "bird", "boat", "bottle", "bus", "car", "cat", "chair", "cow", "diningtable",
-               "dog", "horse", "motorbike", "person", "pottedplant", "sheep", "sofa", "train", "tvmonitor"]
+label_names = [
+    "aeroplane",
+    "bicycle",
+    "bird",
+    "boat",
+    "bottle",
+    "bus",
+    "car",
+    "cat",
+    "chair",
+    "cow",
+    "diningtable",
+    "dog",
+    "horse",
+    "motorbike",
+    "person",
+    "pottedplant",
+    "sheep",
+    "sofa",
+    "train",
+    "tvmonitor",
+]
 
 """
 =====================

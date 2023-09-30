@@ -41,7 +41,7 @@ use_cuda = torch.cuda.is_available()
 # 从硬盘读取语料文件，进行基本的预处理
 # 读取平行语料库
 # 英＝法
-ger_eng = pd.read_table('data/ger_eng.txt', header=None, sep='\t')
+ger_eng = pd.read_table("data/ger_eng.txt", header=None, sep="\t")
 english = ger_eng[0]
 german = ger_eng[1]
 
@@ -65,7 +65,7 @@ class Lang:
     def addSentence(self, sentence):
         # 在语言中添加一个新句子，句子是用空格隔开的一组单词
         # 将单词切分出来，并分别进行处理
-        for word in sentence.split(' '):
+        for word in sentence.split(" "):
             self.addWord(word)
 
     def addWord(self, word):
@@ -79,14 +79,13 @@ class Lang:
         else:
             self.word2count[word] += 1
 
+
 # Turn a Unicode string to plain ASCII, thanks to
 # http://stackoverflow.com/a/518232/2809427
 # 将unicode编码转变为ascii编码
 def unicodeToAscii(s):
-    return ''.join(
-        c for c in unicodedata.normalize('NFD', s)
-        if unicodedata.category(c) != 'Mn'
-    )
+    return "".join(c for c in unicodedata.normalize("NFD", s) if unicodedata.category(c) != "Mn")
+
 
 # 把输入的英文字符串转成小写
 def normalizeEngString(s):
@@ -95,13 +94,15 @@ def normalizeEngString(s):
     s = re.sub(r"[^a-zA-Z.!?]+", r" ", s)
     return s
 
+
 # 对输入的单词对做过滤，保证每句话的单词数不能超过MAX_LENGTH
 def filterPair(p):
-    return len(p[0].split(' ')) < MAX_LENGTH and len(p[1].split(' ')) < MAX_LENGTH
+    return len(p[0].split(" ")) < MAX_LENGTH and len(p[1].split(" ")) < MAX_LENGTH
+
 
 # 输入一个句子，输出一个单词对应的编码序列
 def indexesFromSentence(lang, sentence):
-    return [lang.word2index[word] for word in sentence.split(' ')]
+    return [lang.word2index[word] for word in sentence.split(" ")]
 
 
 # 和上面的函数功能类似，不同在于输出的序列等长＝MAX_LENGTH
@@ -110,61 +111,61 @@ def indexFromSentence(lang, sentence):
     indexes.append(EOS_token)
     for i in range(MAX_LENGTH - len(indexes)):
         indexes.append(EOS_token)
-    return(indexes)
+    return indexes
+
 
 def subsequent_mask(size):
     attn_shape = (size, size)
-    subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype('uint8')
+    subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype("uint8")
     return torch.from_numpy(subsequent_mask) == 0
+
 
 # 从一个词对到下标
 def indexFromPair(pair):
     input_variable = indexFromSentence(input_lang, pair[0])
     input_mask = np.expand_dims((np.array(input_variable) != 1), -2)
     target_variable = indexFromSentence(output_lang, pair[1])
-    target_mask = (np.array(target_variable) != 1)
+    target_mask = np.array(target_variable) != 1
     target_mask = target_mask & (subsequent_mask(len(target_variable)).to(torch.int32)).numpy()
     return (input_variable, input_mask, target_variable, target_mask)
+
 
 # 从一个列表到句子
 def SentenceFromList(lang, lst):
     result = [lang.index2word[i] for i in lst if i != EOS_token]
-    result = ' '.join(result)
-    return(result)
+    result = " ".join(result)
+    return result
+
 
 # 计算准确度的函数
 def rightness(predictions, labels):
     """计算预测错误率的函数，其中predictions是模型给出的一组预测结果，batch_size行num_classes列的矩阵，labels是数据之中的正确答案"""
-    pred = torch.max(predictions.data, 1)[1] # 对于任意一行（一个样本）的输出值的第1个维度，求最大，得到每一行的最大元素的下标
-    rights = int(pred.eq(labels.data).sum()) #将下标与labels中包含的类别进行比较，并累计得到比较正确的数量
-    return rights, len(labels) #返回正确的数量和这一次一共比较了多少元素
-
-
+    pred = torch.max(predictions.data, 1)[1]  # 对于任意一行（一个样本）的输出值的第1个维度，求最大，得到每一行的最大元素的下标
+    rights = int(pred.eq(labels.data).sum())  # 将下标与labels中包含的类别进行比较，并累计得到比较正确的数量
+    return rights, len(labels)  # 返回正确的数量和这一次一共比较了多少元素
 
 
 # 处理数据形成训练数据
 # 设置句子的最大长度
 MAX_LENGTH = 10
 
-#对英文做标准化处理
+# 对英文做标准化处理
 pairs = [[normalizeEngString(ger), normalizeEngString(eng)] for ger, eng in zip(german, english)]
 
 # 对句子对做过滤，处理掉那些超过MAX_LENGTH长度的句子
-input_lang = Lang('German')
-output_lang = Lang('English')
+input_lang = Lang("German")
+output_lang = Lang("English")
 pairs = [pair for pair in pairs if filterPair(pair)]
-print('有效句子对：', len(pairs))
+print("有效句子对：", len(pairs))
 
 # 建立两个字典（中文的和英文的）
 for pair in pairs:
     input_lang.addSentence(pair[0])
     output_lang.addSentence(pair[1])
-    
-print("总单词数:")                               # 有效句子对： 96464
-print(input_lang.name, input_lang.n_words)       # French 17106
-print(output_lang.name, output_lang.n_words)     # English 10426
 
-
+print("总单词数:")  # 有效句子对： 96464
+print(input_lang.name, input_lang.n_words)  # French 17106
+print(output_lang.name, output_lang.n_words)  # English 10426
 
 
 # 形成训练集，首先，打乱所有句子的顺序
@@ -179,18 +180,17 @@ valid_size = len(pairs) // 10
 if valid_size > 10000:
     valid_size = 10000
 pp = pairs
-pairs = pairs[ : - valid_size]
+pairs = pairs[:-valid_size]
 valid_pairs = pp[-valid_size : -valid_size // 2]
-test_pairs = pp[- valid_size // 2 :]
+test_pairs = pp[-valid_size // 2 :]
 
 # 利用PyTorch的dataset和dataloader对象，将数据加载到加载器里面，并且自动分批
 
-batch_size = 32 #一批包含32个数据记录，这个数字越大，系统在训练的时候，每一个周期处理的数据就越多，这样处理越快，但总的数据量会减少
+batch_size = 32  # 一批包含32个数据记录，这个数字越大，系统在训练的时候，每一个周期处理的数据就越多，这样处理越快，但总的数据量会减少
 
-print('训练记录：', len(pairs))        # 训练记录： 86818
-print('校验记录：', len(valid_pairs))  # 校验记录： 4823
-print('测试记录：', len(test_pairs))   # 测试记录： 4823
-
+print("训练记录：", len(pairs))  # 训练记录： 86818
+print("校验记录：", len(valid_pairs))  # 校验记录： 4823
+print("测试记录：", len(test_pairs))  # 测试记录： 4823
 
 
 # 形成训练对列表，用于喂给train_dataset
@@ -209,33 +209,46 @@ test_Y_mask = [pair[3] for pair in test_pairs]
 
 
 # 形成训练集
-train_dataset = DataSet.TensorDataset(torch.LongTensor(pairs_X), torch.Tensor(pairs_X_mask),
-                                      torch.LongTensor(pairs_Y), Variable(torch.Tensor(pairs_Y_mask)))
+train_dataset = DataSet.TensorDataset(
+    torch.LongTensor(pairs_X),
+    torch.Tensor(pairs_X_mask),
+    torch.LongTensor(pairs_Y),
+    Variable(torch.Tensor(pairs_Y_mask)),
+)
 # 形成数据加载器
-train_loader = DataSet.DataLoader(train_dataset, batch_size = batch_size, shuffle = True, num_workers=0)
+train_loader = DataSet.DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
 
 # 校验数据
-valid_dataset = DataSet.TensorDataset(torch.LongTensor(valid_X), torch.Tensor(valid_X_mask),
-                                      torch.LongTensor(valid_Y), Variable(torch.Tensor(valid_Y_mask)))
-valid_loader = DataSet.DataLoader(valid_dataset, batch_size = batch_size, shuffle = True, num_workers=0)
+valid_dataset = DataSet.TensorDataset(
+    torch.LongTensor(valid_X),
+    torch.Tensor(valid_X_mask),
+    torch.LongTensor(valid_Y),
+    Variable(torch.Tensor(valid_Y_mask)),
+)
+valid_loader = DataSet.DataLoader(valid_dataset, batch_size=batch_size, shuffle=True, num_workers=0)
 
 # 测试数据
-test_dataset = DataSet.TensorDataset(torch.LongTensor(test_X), torch.Tensor(test_X_mask),
-                                     torch.LongTensor(test_Y), Variable(torch.Tensor(test_Y_mask)))
-test_loader = DataSet.DataLoader(test_dataset, batch_size = batch_size, shuffle = True, num_workers = 8)
-
-
+test_dataset = DataSet.TensorDataset(
+    torch.LongTensor(test_X),
+    torch.Tensor(test_X_mask),
+    torch.LongTensor(test_Y),
+    Variable(torch.Tensor(test_Y_mask)),
+)
+test_loader = DataSet.DataLoader(test_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
 
 
 """ # # 二、构建Transformer网络  """
+
+
 # 构建位置编码
 class PositionalEncoding(nn.Module):
     "Implement the PE function."
+
     def __init__(self, d_model, dropout, max_len=5000):
         super(PositionalEncoding, self).__init__()
         self.dropout = nn.Dropout(p=dropout)
-        
+
         # Compute the positional encodings once in log space.
         pe = torch.zeros(max_len, d_model)
         position = torch.arange(0, max_len).unsqueeze(1)
@@ -243,12 +256,12 @@ class PositionalEncoding(nn.Module):
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
-        self.register_buffer('pe', pe)
-        
+        self.register_buffer("pe", pe)
+
     def forward(self, x):
-        x = x + Variable(self.pe[:, :x.size(1)], 
-                         requires_grad=False)
+        x = x + Variable(self.pe[:, : x.size(1)], requires_grad=False)
         return self.dropout(x)
+
 
 # 构建嵌入层
 class Embeddings(nn.Module):
@@ -260,6 +273,7 @@ class Embeddings(nn.Module):
     def forward(self, x):
         return self.lut(x) * math.sqrt(self.d_model)
 
+
 # 构建注意力机制
 def attention(query, key, value, mask=None, dropout=None):
     "Compute 'Scaled Dot Product Attention'"
@@ -267,10 +281,11 @@ def attention(query, key, value, mask=None, dropout=None):
     scores = torch.matmul(query, key.transpose(-2, -1)) / math.sqrt(d_k)
     if mask is not None:
         scores = scores.masked_fill(mask == 0, -1e9)
-    p_attn = F.softmax(scores, dim = -1)
+    p_attn = F.softmax(scores, dim=-1)
     if dropout is not None:
         p_attn = dropout(p_attn)
     return torch.matmul(p_attn, value), p_attn
+
 
 # 构建多头注意力机制
 class MultiHeadedAttention(nn.Module):
@@ -284,28 +299,31 @@ class MultiHeadedAttention(nn.Module):
         self.linears = clones(nn.Linear(d_model, d_model), 4)
         self.attn = None
         self.dropout = nn.Dropout(p=dropout)
-        
+
     def forward(self, query, key, value, mask=None):
         "Implements Figure 2"
         if mask is not None:
             # Same mask applied to all h heads.
             mask = mask.unsqueeze(1)
         nbatches = query.size(0)
-        
-        # 1) Do all the linear projections in batch from d_model = h * d_k 
-        query, key, value = [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
-             for l, x in zip(self.linears, (query, key, value))]
-        
-        # 2) Apply attention on all the projected vectors in batch. 
+
+        # 1) Do all the linear projections in batch from d_model = h * d_k
+        query, key, value = [
+            l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2) for l, x in zip(self.linears, (query, key, value))
+        ]
+
+        # 2) Apply attention on all the projected vectors in batch.
         x, self.attn = attention(query, key, value, mask=mask, dropout=self.dropout)
-        
-        # 3) "Concat" using a view and apply a final linear. 
+
+        # 3) "Concat" using a view and apply a final linear.
         x = x.transpose(1, 2).contiguous().view(nbatches, -1, self.h * self.d_k)
         return self.linears[-1](x)
+
 
 # 构建层归一化
 class LayerNorm(nn.Module):
     "Construct a layernorm module (See citation for details)."
+
     def __init__(self, features, eps=1e-6):
         super(LayerNorm, self).__init__()
         self.a_2 = nn.Parameter(torch.ones(features))
@@ -317,9 +335,11 @@ class LayerNorm(nn.Module):
         std = x.std(-1, keepdim=True)
         return self.a_2 * (x - mean) / (std + self.eps) + self.b_2
 
+
 # 构建前馈神经网络
 class PositionwiseFeedForward(nn.Module):
     "Implements FFN equation."
+
     def __init__(self, d_model, d_ff, dropout=0.1):
         super(PositionwiseFeedForward, self).__init__()
         self.w_1 = nn.Linear(d_model, d_ff)
@@ -329,11 +349,13 @@ class PositionwiseFeedForward(nn.Module):
     def forward(self, x):
         return self.w_2(self.dropout(F.relu(self.w_1(x))))
 
+
 class SublayerConnection(nn.Module):
     """
     A residual connection followed by a layer norm.
     Note for code simplicity the norm is first as opposed to last.
     """
+
     def __init__(self, size, dropout):
         super(SublayerConnection, self).__init__()
         self.norm = LayerNorm(size)
@@ -343,8 +365,10 @@ class SublayerConnection(nn.Module):
         "Apply residual connection to any sublayer with the same size."
         return x + self.dropout(sublayer(self.norm(x)))
 
+
 class EncoderLayer(nn.Module):
     "Encoder is made up of self-attn and feed forward (defined below)"
+
     def __init__(self, size, self_attn, feed_forward, dropout):
         super(EncoderLayer, self).__init__()
         self.self_attn = self_attn
@@ -357,26 +381,31 @@ class EncoderLayer(nn.Module):
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
         return self.sublayer[1](x, self.feed_forward)
 
+
 def clones(module, N):
     "Produce N identical layers."
     return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
 
+
 # 构建编码器
 class Encoder(nn.Module):
     "Core encoder is a stack of N layers"
+
     def __init__(self, layer, N):
         super(Encoder, self).__init__()
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
-        
+
     def forward(self, x, mask):
         "Pass the input (and mask) through each layer in turn."
         for layer in self.layers:
             x = layer(x, mask)
         return self.norm(x)
 
+
 class DecoderLayer(nn.Module):
     "Decoder is made of self-attn, src-attn, and feed forward (defined below)"
+
     def __init__(self, size, self_attn, src_attn, feed_forward, dropout):
         super(DecoderLayer, self).__init__()
         self.size = size
@@ -384,7 +413,7 @@ class DecoderLayer(nn.Module):
         self.src_attn = src_attn
         self.feed_forward = feed_forward
         self.sublayer = clones(SublayerConnection(size, dropout), 3)
- 
+
     def forward(self, x, memory, src_mask, tgt_mask):
         "Follow Figure 1 (right) for connections."
         m = memory
@@ -392,21 +421,25 @@ class DecoderLayer(nn.Module):
         x = self.sublayer[1](x, lambda x: self.src_attn(x, m, m, src_mask))
         return self.sublayer[2](x, self.feed_forward)
 
+
 # 构建解码器
 class Decoder(nn.Module):
     "Generic N layer decoder with masking."
+
     def __init__(self, layer, N):
         super(Decoder, self).__init__()
         self.layers = clones(layer, N)
         self.norm = LayerNorm(layer.size)
-        
+
     def forward(self, x, memory, src_mask, tgt_mask):
         for layer in self.layers:
             x = layer(x, memory, src_mask, tgt_mask)
         return self.norm(x)
 
+
 class Generator(nn.Module):
     "Define standard linear + softmax generation step."
+
     def __init__(self, d_model, vocab):
         super(Generator, self).__init__()
         self.proj = nn.Linear(d_model, vocab)
@@ -414,12 +447,14 @@ class Generator(nn.Module):
     def forward(self, x):
         return F.log_softmax(self.proj(x), dim=-1)
 
+
 # 构建编码器-解码器
 class EncoderDecoder(nn.Module):
     """
-    A standard Encoder-Decoder architecture. Base for this and many 
+    A standard Encoder-Decoder architecture. Base for this and many
     other models.
     """
+
     def __init__(self, encoder, decoder, src_embed, tgt_embed, generator):
         super(EncoderDecoder, self).__init__()
         self.encoder = encoder
@@ -427,21 +462,20 @@ class EncoderDecoder(nn.Module):
         self.src_embed = src_embed
         self.tgt_embed = tgt_embed
         self.generator = generator
-        
+
     def forward(self, src, tgt, src_mask, tgt_mask):
         "Take in and process masked src and target sequences."
-        return self.generator(self.decode(self.encode(src, src_mask), src_mask,
-                                          tgt, tgt_mask))
-    
+        return self.generator(self.decode(self.encode(src, src_mask), src_mask, tgt, tgt_mask))
+
     def encode(self, src, src_mask):
         return self.encoder(self.src_embed(src), src_mask)
-    
+
     def decode(self, memory, src_mask, tgt, tgt_mask):
         return self.decoder(self.tgt_embed(tgt), memory, src_mask, tgt_mask)
-    
+
+
 # 构建Transformer网络
-def make_model(src_vocab, tgt_vocab, N=6, 
-               d_model=512, d_ff=2048, h=8, dropout=0.1):
+def make_model(src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0.1):
     "Helper: Construct a model from hyperparameters."
     c = copy.deepcopy
     attn = MultiHeadedAttention(h, d_model)
@@ -449,25 +483,24 @@ def make_model(src_vocab, tgt_vocab, N=6,
     position = PositionalEncoding(d_model, dropout)
     model = EncoderDecoder(
         Encoder(EncoderLayer(d_model, c(attn), c(ff), dropout), N),
-        Decoder(DecoderLayer(d_model, c(attn), c(attn), 
-                             c(ff), dropout), N),
+        Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout), N),
         nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
         nn.Sequential(Embeddings(d_model, tgt_vocab), c(position)),
-        Generator(d_model, tgt_vocab))
-    
-    # This was important from their code. 
+        Generator(d_model, tgt_vocab),
+    )
+
+    # This was important from their code.
     # Initialize parameters with Glorot / fan_avg.
-    #for p in model.parameters():
+    # for p in model.parameters():
     #    if p.dim() > 1:
     #        nn.init.xavier_uniform_(p)
     return model
 
 
-
 """-----------------
 # 开始训练过程
 --------------------"""
-#定义网络架构
+# 定义网络架构
 max_length = MAX_LENGTH
 model = make_model(input_lang.n_words, output_lang.n_words)
 
@@ -480,7 +513,7 @@ optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 criterion = nn.NLLLoss()
 
 num_epoch = 1
-'''
+"""
 # 开始训练周期循环
 plot_losses = []
 for epoch in range(num_epoch):
@@ -559,9 +592,9 @@ for epoch in range(num_epoch):
 
 # 绘制统计指标曲线图
 torch.save(model, 'model-final.mdl')
-'''
-model = torch.load('model-final.mdl')
-'''
+"""
+model = torch.load("model-final.mdl")
+"""
 a = [i[0] for i in plot_losses]
 b = [i[1] for i in plot_losses]
 c = [i[2] * 100 for i in plot_losses]
@@ -572,7 +605,7 @@ plt.xlabel('Epoch')
 plt.ylabel('Loss & Accuracy')
 plt.legend()
 plt.savefig('31.jpg', dpi=600)
-'''
+"""
 
 
 def greedy_decode(model, src, src_mask, max_len, start_symbol):
@@ -588,6 +621,7 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol):
         next_word = next_word.data[0]
         ys = torch.cat([ys, torch.ones(1, 1).type_as(src.data).fill_(next_word)], dim=1)
     return torch.cat(outputs, 1), ys
+
 
 # 从测试集中随机挑选20个句子来测试翻译的结果
 indices = np.random.choice(range(len(test_X)), 20)
@@ -613,16 +647,16 @@ for ind in indices:
         rights.append(right)
     sentence = SentenceFromList(output_lang, output_sentence.cpu().numpy().reshape(-1).tolist())
     standard = SentenceFromList(output_lang, target[0])
-    print('机器翻译：', sentence)
-    print('标准翻译：', standard)
+    print("机器翻译：", sentence)
+    print("标准翻译：", standard)
     # 输出本句话的准确率
     right_ratio = 1.0 * np.sum([i[0] for i in rights]) / np.sum([i[1] for i in rights])
-    print('词准确率：', 100.0 * right_ratio)
-    print('\n')
+    print("词准确率：", 100.0 * right_ratio)
+    print("\n")
 
 
 # 通过几个特殊的句子翻译，考察注意力机制关注的情况
-input_sentence = 'elle est trop petit .'
+input_sentence = "elle est trop petit ."
 data = np.array([indexFromSentence(input_lang, input_sentence)])
 
 input_variable = torch.LongTensor(data).cuda() if use_cuda else torch.LongTensor(data)
@@ -641,26 +675,26 @@ for di in range(MAX_LENGTH - 1):
     right = rightness(outputs[:, di, :], target_variable[:, di])
     rights.append(right)
 sentence = SentenceFromList(output_lang, output_sentence.numpy().reshape(-1).tolist())
-print('机器翻译：', sentence)
-print('\n')
-
+print("机器翻译：", sentence)
+print("\n")
 
 
 # 将每一步存储的注意力权重组合到一起就形成了注意力矩阵，绘制为图
 fig = plt.figure()
 ax = fig.add_subplot(111)
-cax = ax.matshow(model.decoder.layers[-1].src_attn.attn[0, 0].detach().numpy(), cmap='bone')
+cax = ax.matshow(model.decoder.layers[-1].src_attn.attn[0, 0].detach().numpy(), cmap="bone")
 fig.colorbar(cax)
 
 # 设置坐标轴
-ax.set_xticklabels([''] + input_sentence.split(' ') + ['<EOS>'], rotation=90)
-ax.set_yticklabels([''] + sentence.split(' '))
+ax.set_xticklabels([""] + input_sentence.split(" ") + ["<EOS>"], rotation=90)
+ax.set_yticklabels([""] + sentence.split(" "))
 
 # 在标度上展示单词
 import matplotlib.ticker as ticker
+
 ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
 ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
-plt.savefig('32.jpg', dpi=600)
+plt.savefig("32.jpg", dpi=600)
 plt.show()
 
 
@@ -685,25 +719,25 @@ outputs = model(input_variable, target_variable, input_mask, target_mask)
 
 output_sentence = outputs.argmax(2)
 sentence = SentenceFromList(output_lang, output_sentence.numpy().reshape(-1).tolist())
-print('机器翻译：', sentence)
-print('\n')
-
+print("机器翻译：", sentence)
+print("\n")
 
 
 # 将每一步存储的注意力权重组合到一起就形成了注意力矩阵，绘制为图
 fig = plt.figure()
 ax = fig.add_subplot(111)
-cax = ax.matshow(model.decoder.layers[-1].src_attn.attn[0, 0].detach().numpy(), cmap='bone')
+cax = ax.matshow(model.decoder.layers[-1].src_attn.attn[0, 0].detach().numpy(), cmap="bone")
 fig.colorbar(cax)
 
 # 设置坐标轴
-ax.set_xticklabels([''] + input_sentence.split(' ') + ['<EOS>'], rotation=90)
-ax.set_yticklabels([''] + sentence.split(' '))
+ax.set_xticklabels([""] + input_sentence.split(" ") + ["<EOS>"], rotation=90)
+ax.set_yticklabels([""] + sentence.split(" "))
 
 # 在标度上展示单词
 import matplotlib.ticker as ticker
+
 ax.xaxis.set_major_locator(ticker.MultipleLocator(1))
 ax.yaxis.set_major_locator(ticker.MultipleLocator(1))
 
-plt.savefig('33.jpg', dpi=600)
+plt.savefig("33.jpg", dpi=600)
 plt.show()

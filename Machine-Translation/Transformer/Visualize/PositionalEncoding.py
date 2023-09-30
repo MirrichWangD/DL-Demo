@@ -34,11 +34,11 @@ cmap = sns.cubehelix_palette(start=1.5, rot=3, gamma=0.8, as_cmap=True)
 
 
 class PositionalEncoding(nn.Module):
-    """ 位置编码层 """
+    """位置编码层"""
 
     def __init__(self, emb_size: int, dropout: float, max_len: int = 5000):
         super(PositionalEncoding, self).__init__()
-        den = torch.exp(- torch.arange(0, emb_size, 2) * math.log(10000) / emb_size)
+        den = torch.exp(-torch.arange(0, emb_size, 2) * math.log(10000) / emb_size)
         pos = torch.arange(0, max_len).reshape(max_len, 1)
         pos_embedding = torch.zeros((max_len, emb_size))
         pos_embedding[:, 0::2] = torch.sin(pos * den)
@@ -49,11 +49,11 @@ class PositionalEncoding(nn.Module):
         # self.register_buffer('pos_embedding', pos_embedding)
 
     def forward(self, token_embedding: torch.Tensor):
-        return self.dropout(token_embedding + self.pos_embedding[:token_embedding.size(0), :])
+        return self.dropout(token_embedding + self.pos_embedding[: token_embedding.size(0), :])
 
 
 d_model = 512
-pe = PositionalEncoding(d_model, .1)
+pe = PositionalEncoding(d_model, 0.1)
 
 sns.heatmap(pe.pos_embedding[:d_model, 0], cmap=cmap)
 plt.savefig("imgs/PositionalEncoding.png")

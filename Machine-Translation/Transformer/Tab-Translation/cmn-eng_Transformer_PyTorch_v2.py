@@ -80,7 +80,7 @@ def clones(module, num):
 
 
 class PositionalEncoding(nn.Module):
-    """ 实现 Positional Encoding（位置编码）"""
+    """实现 Positional Encoding（位置编码）"""
 
     def __init__(self, d_model, dropout, max_len=5000):
         """
@@ -100,7 +100,7 @@ class PositionalEncoding(nn.Module):
         pe[:, 0::2] = torch.sin(position * div_term)
         pe[:, 1::2] = torch.cos(position * div_term)
         pe = pe.unsqueeze(0)
-        self.register_buffer('pe', pe)
+        self.register_buffer("pe", pe)
 
     def forward(self, x):
         """
@@ -111,7 +111,7 @@ class PositionalEncoding(nn.Module):
         Returns:
 
         """
-        x = x + Variable(self.pe[:, :x.size(1)], requires_grad=False)
+        x = x + Variable(self.pe[:, : x.size(1)], requires_grad=False)
         return self.dropout(x)
 
 
@@ -139,7 +139,7 @@ def attention(query, key, value, mask=None, dropout=None):
 
 
 class MultiHeadedAttention(nn.Module):
-    """ 多头注意力实现 """
+    """多头注意力实现"""
 
     def __init__(self, h, d_model, dropout=0.1):
         """
@@ -176,8 +176,9 @@ class MultiHeadedAttention(nn.Module):
         nbatches = query.size(0)
 
         # 1) Do all the linear projections in batch from d_model = h * d_k
-        query, key, value = [l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2)
-                             for l, x in zip(self.linears, (query, key, value))]
+        query, key, value = [
+            l(x).view(nbatches, -1, self.h, self.d_k).transpose(1, 2) for l, x in zip(self.linears, (query, key, value))
+        ]
 
         # 2) Apply attention on all the projected vectors in batch.
         x, self.attn = attention(query, key, value, mask=mask, dropout=self.dropout)
@@ -188,7 +189,7 @@ class MultiHeadedAttention(nn.Module):
 
 
 class LayerNorm(nn.Module):
-    """ 实现层归一化 """
+    """实现层归一化"""
 
     def __init__(self, features, eps=1e-6):
         """
@@ -247,7 +248,7 @@ class SublayerConnection(nn.Module):
 
 
 class PositionwiseFeedForward(nn.Module):
-    """ 实现前馈神经网络层 """
+    """实现前馈神经网络层"""
 
     def __init__(self, d_model, d_ff, dropout=0.1):
         """
@@ -263,12 +264,12 @@ class PositionwiseFeedForward(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x):
-        """ 计算 ReLU(X·W_1 + b_1)W_2 + b_2"""
+        """计算 ReLU(X·W_1 + b_1)W_2 + b_2"""
         return self.w_2(self.dropout(F.relu(self.w_1(x))))
 
 
 class EncoderLayer(nn.Module):
-    """ 编码器由自注意（Self-Attention）和前馈（FFN）组成，定义如下 """
+    """编码器由自注意（Self-Attention）和前馈（FFN）组成，定义如下"""
 
     def __init__(self, size, self_attn, feed_forward, dropout):
         """
@@ -286,13 +287,13 @@ class EncoderLayer(nn.Module):
         self.size = size
 
     def forward(self, x, mask):
-        """ 按照原文图 1 进行连接。 """
+        """按照原文图 1 进行连接。"""
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, mask))
         return self.sublayer[1](x, self.feed_forward)
 
 
 class Encoder(nn.Module):
-    """ 生成 N 个编码块的编码器 """
+    """生成 N 个编码块的编码器"""
 
     def __init__(self, layer, N):
         """
@@ -306,7 +307,7 @@ class Encoder(nn.Module):
         self.norm = LayerNorm(layer.size)
 
     def forward(self, x, mask):
-        """ 依次在每个层中传递输入 """
+        """依次在每个层中传递输入"""
         for layer in self.layers:
             x = layer(x, mask)
         return self.norm(x)
@@ -322,12 +323,12 @@ def subsequent_mask(size):
 
     """
     attn_shape = (1, size, size)
-    subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype('uint8')
+    subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype("uint8")
     return torch.from_numpy(subsequent_mask) == 0
 
 
 class DecoderLayer(nn.Module):
-    """ 解码器由自注意力（Self-Attention）、编码器的注意力（src-Attention）和前馈网络（FFN）组成 """
+    """解码器由自注意力（Self-Attention）、编码器的注意力（src-Attention）和前馈网络（FFN）组成"""
 
     def __init__(self, size, self_attn, src_attn, feed_forward, dropout):
         """
@@ -347,7 +348,7 @@ class DecoderLayer(nn.Module):
         self.sublayer = clones(SublayerConnection(size, dropout), 3)
 
     def forward(self, x, memory, src_mask, tgt_mask):
-        """ 按照原文图 1 进行连接。 """
+        """按照原文图 1 进行连接。"""
         m = memory
         x = self.sublayer[0](x, lambda x: self.self_attn(x, x, x, tgt_mask))
         x = self.sublayer[1](x, lambda x: self.src_attn(x, m, m, src_mask))
@@ -355,7 +356,7 @@ class DecoderLayer(nn.Module):
 
 
 class Decoder(nn.Module):
-    """ 带掩码操作的 N 层解码块 """
+    """带掩码操作的 N 层解码块"""
 
     def __init__(self, layer, N):
         """
@@ -375,7 +376,7 @@ class Decoder(nn.Module):
 
 
 class Generator(nn.Module):
-    """ 定义标准线性+ softmax生成步骤。 """
+    """定义标准线性+ softmax生成步骤。"""
 
     def __init__(self, d_model, vocab):
         """
@@ -392,7 +393,7 @@ class Generator(nn.Module):
 
 
 class EncoderDecoder(nn.Module):
-    """ 标准的编码器-解码器架构 """
+    """标准的编码器-解码器架构"""
 
     def __init__(self, encoder, decoder, src_embed, tgt_embed, generator):
         """
@@ -413,8 +414,7 @@ class EncoderDecoder(nn.Module):
 
     def forward(self, src, tgt, src_mask, tgt_mask):
         "Take in and process masked src and target sequences."
-        return self.decode(self.encode(src, src_mask), src_mask,
-                           tgt, tgt_mask)
+        return self.decode(self.encode(src, src_mask), src_mask, tgt, tgt_mask)
 
     def encode(self, src, src_mask):
         return self.encoder(self.src_embed(src), src_mask)
@@ -424,7 +424,7 @@ class EncoderDecoder(nn.Module):
 
 
 class Embeddings(nn.Module):
-    """ 词嵌入层 """
+    """词嵌入层"""
 
     def __init__(self, d_model, vocab):
         super(Embeddings, self).__init__()
@@ -437,7 +437,7 @@ class Embeddings(nn.Module):
 
 
 def make_model(src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0.1, resume=None):
-    """ Helper: Construct a model from hyperparameters. """
+    """Helper: Construct a model from hyperparameters."""
     c = copy.deepcopy
     attn = MultiHeadedAttention(h, d_model)
     ff = PositionwiseFeedForward(d_model, d_ff, dropout)
@@ -447,7 +447,7 @@ def make_model(src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0
         Decoder(DecoderLayer(d_model, c(attn), c(attn), c(ff), dropout), N),
         nn.Sequential(Embeddings(d_model, src_vocab), c(position)),
         nn.Sequential(Embeddings(d_model, tgt_vocab), c(position)),
-        Generator(d_model, tgt_vocab)
+        Generator(d_model, tgt_vocab),
     )
     # This was important from their code.
     # Initialize parameters with Glorot / fan_avg.
@@ -467,7 +467,7 @@ def make_model(src_vocab, tgt_vocab, N=6, d_model=512, d_ff=2048, h=8, dropout=0
 
 
 class LabelSmoothing(nn.Module):
-    """ Implement label smoothing. """
+    """Implement label smoothing."""
 
     def __init__(self, size, padding_idx, smoothing=0.0):
         super(LabelSmoothing, self).__init__()
@@ -492,7 +492,7 @@ class LabelSmoothing(nn.Module):
 
 
 class SimpleLossCompute:
-    """ A simple loss compute and train function. """
+    """A simple loss compute and train function."""
 
     def __init__(self, generator, criterion, opt=None):
         self.generator = generator
@@ -501,8 +501,7 @@ class SimpleLossCompute:
 
     def __call__(self, x, y, norm):
         x = self.generator(x)
-        loss = self.criterion(x.contiguous().view(-1, x.size(-1)),
-                              y.contiguous().view(-1)) / norm
+        loss = self.criterion(x.contiguous().view(-1, x.size(-1)), y.contiguous().view(-1)) / norm
         loss.backward()
         if self.opt is not None:
             self.opt.step()
@@ -511,7 +510,7 @@ class SimpleLossCompute:
 
 
 class NoamOpt:
-    """ Optim wrapper that implements rate. """
+    """Optim wrapper that implements rate."""
 
     def __init__(self, model_size, factor, warmup, optimizer):
         self.optimizer = optimizer
@@ -522,26 +521,28 @@ class NoamOpt:
         self._rate = 0
 
     def step(self):
-        """ Update parameters and rate """
+        """Update parameters and rate"""
         self._step += 1
         rate = self.rate()
         for p in self.optimizer.param_groups:
-            p['lr'] = rate
+            p["lr"] = rate
         self._rate = rate
         self.optimizer.step()
 
     def rate(self, step=None):
-        """ Implement `lrate` above """
+        """Implement `lrate` above"""
         if step is None:
             step = self._step
-        return self.factor * \
-            (self.model_size ** (-0.5) *
-             min(step ** (-0.5), step * self.warmup ** (-1.5)))
+        return self.factor * (self.model_size ** (-0.5) * min(step ** (-0.5), step * self.warmup ** (-1.5)))
 
 
 def get_std_opt(model):
-    return NoamOpt(model.src_embed[0].d_model, 2, 4000,
-                   torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+    return NoamOpt(
+        model.src_embed[0].d_model,
+        2,
+        4000,
+        torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
+    )
 
 
 def greedy_decode(model, src, src_mask, max_len, start_symbol=BOS_TOKEN):
@@ -562,9 +563,12 @@ def greedy_decode(model, src, src_mask, max_len, start_symbol=BOS_TOKEN):
     # ys代表目前已生成的序列，最初为仅包含一个起始符的序列，不断将预测结果追加到序列最后
     ys = torch.ones(1, 1).fill_(start_symbol).type_as(src.data)
     for i in range(max_len - 1):
-        out = model.decode(memory, src_mask,
-                           Variable(ys),
-                           Variable(subsequent_mask(ys.size(1)).type_as(src.data)))
+        out = model.decode(
+            memory,
+            src_mask,
+            Variable(ys),
+            Variable(subsequent_mask(ys.size(1)).type_as(src.data)),
+        )
         prob = model.generator(out[:, -1])
         _, next_word = torch.max(prob, dim=1)
         next_word = next_word.data[0]
@@ -587,7 +591,7 @@ def Traditional2Simplified(sentence: str) -> str:
     Returns:
 
     """
-    sentence = Converter('zh-hans').convert(sentence)
+    sentence = Converter("zh-hans").convert(sentence)
     return sentence
 
 
@@ -627,7 +631,7 @@ def load_data(file_path, src_func=nltk.word_tokenize, tgt_func=lambda x: " ".joi
     file = open(file_path, encoding="utf-8")
     src_word, tgt_word = [], []
     for line in file:
-        src_sent, tgt_sent = line.rstrip("\n").split('\t')[:2]
+        src_sent, tgt_sent = line.rstrip("\n").split("\t")[:2]
         tgt_sent = Traditional2Simplified(tgt_sent)
         # 分词
         src_word.append(src_func(src_sent))
@@ -649,7 +653,7 @@ def load_data(file_path, src_func=nltk.word_tokenize, tgt_func=lambda x: " ".joi
 
 
 class TranslationDataset(Dataset):
-    """ 机器翻译数据集 """
+    """机器翻译数据集"""
 
     def __init__(self, data, src_vocab, tgt_vocab, max_len):
         """
@@ -669,12 +673,18 @@ class TranslationDataset(Dataset):
     def __getitem__(self, idx):
         src_word, tgt_word = self.data[idx]
         src_token = torch.tensor(
-            batch_padding([[BOS_TOKEN] + self.src_vocab.lookup_indices(src_word) + [EOS_TOKEN]], self.max_len),
-            dtype=torch.int
+            batch_padding(
+                [[BOS_TOKEN] + self.src_vocab.lookup_indices(src_word) + [EOS_TOKEN]],
+                self.max_len,
+            ),
+            dtype=torch.int,
         )
         tgt_token = torch.tensor(
-            batch_padding([[BOS_TOKEN] + self.tgt_vocab.lookup_indices(tgt_word) + [EOS_TOKEN]], self.max_len),
-            dtype=torch.int
+            batch_padding(
+                [[BOS_TOKEN] + self.tgt_vocab.lookup_indices(tgt_word) + [EOS_TOKEN]],
+                self.max_len,
+            ),
+            dtype=torch.int,
         )
         src_mask = (src_token != PAD_TOKEN).unsqueeze(-2)
         tgt_mask = (tgt_token[:, :-1] != PAD_TOKEN).unsqueeze(-2)
@@ -724,8 +734,12 @@ if __name__ == "__main__":
 
     criterion = LabelSmoothing(size=len(zh_vocab), padding_idx=0, smoothing=0.0)
     model = make_model(len(en_vocab), len(zh_vocab), resume=resume).to(DEVICE)
-    optimizer = NoamOpt(model.src_embed[0].d_model, 1, 400,
-                        torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9))
+    optimizer = NoamOpt(
+        model.src_embed[0].d_model,
+        1,
+        400,
+        torch.optim.Adam(model.parameters(), lr=0, betas=(0.9, 0.98), eps=1e-9),
+    )
 
     # ------------------------------- #
     # 模型训练和验证
@@ -752,9 +766,17 @@ if __name__ == "__main__":
             total_loss += loss
             # 打印训练记录
             if step % 50 == 0:
-                print("Epoch: %d/%d\t Step: %d/%d\t Loss: %.4f\t Time: %fs" % (
-                    epoch + 1, epochs, step + 1, len(train_iterator), loss / num_tokens, time.time() - st
-                ))
+                print(
+                    "Epoch: %d/%d\t Step: %d/%d\t Loss: %.4f\t Time: %fs"
+                    % (
+                        epoch + 1,
+                        epochs,
+                        step + 1,
+                        len(train_iterator),
+                        loss / num_tokens,
+                        time.time() - st,
+                    )
+                )
 
         model.eval()
         print(" Start Evaluating ".center(50, "#"))
@@ -772,9 +794,15 @@ if __name__ == "__main__":
             val_total_loss += loss
 
             if step % 10 == 0:
-                print("Evaluating Step: %d/%d, Loss: %.4f, Tokens per Sec: %fs" % (
-                    step + 1, len(val_iterator), loss / num_tokens, time.time() - val_st
-                ))
+                print(
+                    "Evaluating Step: %d/%d, Loss: %.4f, Tokens per Sec: %fs"
+                    % (
+                        step + 1,
+                        len(val_iterator),
+                        loss / num_tokens,
+                        time.time() - val_st,
+                    )
+                )
 
         torch.save(model.state_dict(), f"checkpoints/Epoch-{epoch + 1}.pth")  # 模型权重保存
 
@@ -789,5 +817,11 @@ if __name__ == "__main__":
         pred_loc = torch.nonzero(pred == EOS_TOKEN)[0]
         print("=" * 50)
         # print(pred_result)
-        print("pred:", " ".join(zh_vocab.lookup_tokens(pred[0][:src_loc[1] + 2].data.tolist())))
-        print("real:", " ".join(zh_vocab.lookup_tokens(tgt[0][:pred_loc[1] + 1].data.tolist())))
+        print(
+            "pred:",
+            " ".join(zh_vocab.lookup_tokens(pred[0][: src_loc[1] + 2].data.tolist())),
+        )
+        print(
+            "real:",
+            " ".join(zh_vocab.lookup_tokens(tgt[0][: pred_loc[1] + 1].data.tolist())),
+        )

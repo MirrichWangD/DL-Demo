@@ -42,38 +42,45 @@ with tqdm(total=len(files)) as pbar:
         dom = xml.dom.minidom.parse(str(file))
         # 得到文档元素对象
         root = dom.documentElement
-        name = root.getElementsByTagName('filename')[0].firstChild.data.split(".")[0]
-        w = root.getElementsByTagName('width')[0].firstChild.data.split(".")[0]
-        h = root.getElementsByTagName('height')[0].firstChild.data.split(".")[0]
+        name = root.getElementsByTagName("filename")[0].firstChild.data.split(".")[0]
+        w = root.getElementsByTagName("width")[0].firstChild.data.split(".")[0]
+        h = root.getElementsByTagName("height")[0].firstChild.data.split(".")[0]
         # 获取目标物体
-        data = root.getElementsByTagName('object')
+        data = root.getElementsByTagName("object")
         shapes = []
         for doc in data:
             # 获取标签
-            label = doc.getElementsByTagName('name')[0].firstChild.data
+            label = doc.getElementsByTagName("name")[0].firstChild.data
             # 获取左上角、右下角坐标
-            x1 = float(doc.getElementsByTagName('xmin')[0].firstChild.data)
-            y1 = float(doc.getElementsByTagName('ymin')[0].firstChild.data)
-            x2 = float(doc.getElementsByTagName('xmax')[0].firstChild.data)
-            y2 = float(doc.getElementsByTagName('ymax')[0].firstChild.data)
+            x1 = float(doc.getElementsByTagName("xmin")[0].firstChild.data)
+            y1 = float(doc.getElementsByTagName("ymin")[0].firstChild.data)
+            x2 = float(doc.getElementsByTagName("xmax")[0].firstChild.data)
+            y2 = float(doc.getElementsByTagName("ymax")[0].firstChild.data)
             # 添加规范格式单条数据
-            shapes.append({
-                "label": label,
-                "points": [[x1, y1], [x2, y2]],
-                "group_id": None,
-                "shape_type": "rectangle",
-                "flags": {}
-            })
+            shapes.append(
+                {
+                    "label": label,
+                    "points": [[x1, y1], [x2, y2]],
+                    "group_id": None,
+                    "shape_type": "rectangle",
+                    "flags": {},
+                }
+            )
         # 保存单张图片JSON文件
         with open(output_dir / f"{name}.json", "w+", encoding="utf-8") as f:
-            json.dump({
-                "version": version,
-                "flags": {},
-                "shapes": shapes,
-                "imagePath": f"{name}.jpg",
-                "imageData": None,
-                "imageHeight": h,
-                "imageWidth": w
-            }, f, indent=4, ensure_ascii=False)
+            json.dump(
+                {
+                    "version": version,
+                    "flags": {},
+                    "shapes": shapes,
+                    "imagePath": f"{name}.jpg",
+                    "imageData": None,
+                    "imageHeight": h,
+                    "imageWidth": w,
+                },
+                f,
+                indent=4,
+                ensure_ascii=False,
+            )
         pbar.update(1)
         pbar.set_postfix_str(file.name)

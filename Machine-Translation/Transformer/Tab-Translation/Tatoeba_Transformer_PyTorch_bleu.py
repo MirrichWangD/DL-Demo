@@ -63,11 +63,7 @@ PAD_IDX, UNK_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
 SPECIALS = ["<pad>", "<unk>", "<bos>", "<eos>"]
 # 定义 spacy 语言模型库，用于分词，该部分可以自行增加
 # 注意！运行时请确保输入的 src_lang 和 tgt_lang 能够在此查询到相对应的 Spacy 语言模块，否则会构造数据集时报错
-SPACY = {
-    "de": "de_core_news_sm",
-    "en": "en_core_web_sm",
-    "zh": "zh_core_web_sm"
-}
+SPACY = {"de": "de_core_news_sm", "en": "en_core_web_sm", "zh": "zh_core_web_sm"}
 
 """+++++++++++++++++++++++++
 @@@ 变量对象定义
@@ -75,8 +71,8 @@ SPACY = {
 
 
 def get_args_parser():
-    """ 设置对象解释器 """
-    parser = argparse.ArgumentParser('Transformer Arguments', add_help=False)
+    """设置对象解释器"""
+    parser = argparse.ArgumentParser("Transformer Arguments", add_help=False)
 
     # 随机数种子
     parser.add_argument("--seed", default=666, type=int)
@@ -97,7 +93,7 @@ def get_args_parser():
     parser.add_argument("--n_heads", default=8, type=int, help="多头注意力头的数量")
     parser.add_argument("--d_model", default=512, type=int, help="Embedding嵌入层维数")
     parser.add_argument("--d_ff", default=2048, type=int, help="FFN维数")
-    parser.add_argument("--dropout", default=.1, type=float, help="LN层Dropout比例")
+    parser.add_argument("--dropout", default=0.1, type=float, help="LN层Dropout比例")
     parser.add_argument("--resume", default=None, type=str, help="导入模型权重路径")
 
     # 训练参数
@@ -117,14 +113,16 @@ def get_args_parser():
 
 
 class TranslationDataset(Dataset):
-    """ 机器翻译数据集 """
+    """机器翻译数据集"""
 
-    def __init__(self,
-                 file_path: str,
-                 src_lang: str = "en",
-                 tgt_lang: str = "zh",
-                 src_dict: str = None,
-                 tgt_dict: str = None):
+    def __init__(
+        self,
+        file_path: str,
+        src_lang: str = "en",
+        tgt_lang: str = "zh",
+        src_dict: str = None,
+        tgt_dict: str = None,
+    ):
         """
 
         Args:
@@ -171,22 +169,27 @@ class TranslationDataset(Dataset):
         self.tgt_vocab.set_default_index(UNK_IDX)
 
     def __len__(self):
-        """ 数据集整体长度 """
+        """数据集整体长度"""
         return self.length
 
     def __repr__(self):
-        """ 字符串可视化显示数据集信息 """
-        return " Dataset Info ".center(50, "=") + "\n" + \
-            "| %-21s | %-22s |\n" % ("size", self.length) + \
-            "| %-21s | %-22s |\n" % (f"src vocab: {self.src_lang}", len(self.src_vocab)) + \
-            "| %-21s | %-22s |\n" % (f"tgt vocab: {self.tgt_lang}", len(self.tgt_vocab)) + "=" * 50
+        """字符串可视化显示数据集信息"""
+        return (
+            " Dataset Info ".center(50, "=")
+            + "\n"
+            + "| %-21s | %-22s |\n" % ("size", self.length)
+            + "| %-21s | %-22s |\n" % (f"src vocab: {self.src_lang}", len(self.src_vocab))
+            + "| %-21s | %-22s |\n" % (f"tgt vocab: {self.tgt_lang}", len(self.tgt_vocab))
+            + "=" * 50
+        )
 
     def __getitem__(self, idx):
-        """ 根据索引 idx 获取 src、tgt 的 tokens """
+        """根据索引 idx 获取 src、tgt 的 tokens"""
         # 通过 vocab 获取 token，并且前后插入起始、终止符号
         src = [BOS_IDX] + self.src_vocab.lookup_indices(self.src_sentences[idx]) + [EOS_IDX]
         tgt = [BOS_IDX] + self.tgt_vocab.lookup_indices(self.tgt_sentences[idx]) + [EOS_IDX]
         return torch.tensor(src), torch.tensor(tgt)
+
 
 """++++++++++++++++++++++
 @@@ Mask处理
@@ -206,7 +209,7 @@ def generate_square_subsequent_mask(sz: int) -> Tensor:
     # 生成倒三角全为 0 的矩阵
     mask = (torch.triu(torch.ones((sz, sz))) == 1).transpose(0, 1)
     # 将上三角全部使用 -inf 填充（不包括对角线）
-    mask = mask.float().masked_fill(mask == 0, float('-inf')).masked_fill(mask == 1, float(0.0))
+    mask = mask.float().masked_fill(mask == 0, float("-inf")).masked_fill(mask == 1, float(0.0))
     return mask
 
 
@@ -263,11 +266,11 @@ def collate_fn(batch):
 
 
 class PositionalEncoding(nn.Module):
-    """ 位置编码层 """
+    """位置编码层"""
 
     def __init__(self, emb_size: int, dropout: float, max_len: int = 5000):
         super(PositionalEncoding, self).__init__()
-        den = torch.exp(- torch.arange(0, emb_size, 2) * math.log(10000) / emb_size)
+        den = torch.exp(-torch.arange(0, emb_size, 2) * math.log(10000) / emb_size)
         pos = torch.arange(0, max_len).reshape(max_len, 1)
         pos_embedding = torch.zeros((max_len, emb_size))
         pos_embedding[:, 0::2] = torch.sin(pos * den)
@@ -275,15 +278,15 @@ class PositionalEncoding(nn.Module):
         pos_embedding = pos_embedding.unsqueeze(-2)
 
         self.dropout = nn.Dropout(dropout)
-        self.register_buffer('pos_embedding', pos_embedding)
+        self.register_buffer("pos_embedding", pos_embedding)
 
     def forward(self, token_embedding: Tensor):
-        return self.dropout(token_embedding + self.pos_embedding[:token_embedding.size(0), :])
+        return self.dropout(token_embedding + self.pos_embedding[: token_embedding.size(0), :])
 
 
 # helper Module to convert tensor of input indices into corresponding tensor of token embeddings
 class TokenEmbedding(nn.Module):
-    """ 词向量嵌入层 """
+    """词向量嵌入层"""
 
     def __init__(self, vocab_size: int, emb_size):
         super(TokenEmbedding, self).__init__()
@@ -296,42 +299,56 @@ class TokenEmbedding(nn.Module):
 
 # Seq2Seq Network
 class Transformer(nn.Module):
-    """ Transformer Seq2Seq模型 """
+    """Transformer Seq2Seq模型"""
 
-    def __init__(self,
-                 num_enc_layers: int,
-                 num_dec_layers: int,
-                 d_model: int,
-                 n_head: int,
-                 src_vocab_size: int,
-                 tgt_vocab_size: int,
-                 dim_feedforward: int = 512,
-                 dropout: float = 0.1):
+    def __init__(
+        self,
+        num_enc_layers: int,
+        num_dec_layers: int,
+        d_model: int,
+        n_head: int,
+        src_vocab_size: int,
+        tgt_vocab_size: int,
+        dim_feedforward: int = 512,
+        dropout: float = 0.1,
+    ):
         super(Transformer, self).__init__()
-        self.transformer = nn.Transformer(d_model=d_model,
-                                          nhead=n_head,
-                                          num_encoder_layers=num_enc_layers,
-                                          num_decoder_layers=num_dec_layers,
-                                          dim_feedforward=dim_feedforward,
-                                          dropout=dropout)
+        self.transformer = nn.Transformer(
+            d_model=d_model,
+            nhead=n_head,
+            num_encoder_layers=num_enc_layers,
+            num_decoder_layers=num_dec_layers,
+            dim_feedforward=dim_feedforward,
+            dropout=dropout,
+        )
         # 输出全连接层：由于使用的 nn.CrossEntropyLoss 因此不需要作 log_softmax 处理
         self.generator = nn.Linear(d_model, tgt_vocab_size)
         self.src_tok_emb = TokenEmbedding(src_vocab_size, d_model)
         self.tgt_tok_emb = TokenEmbedding(tgt_vocab_size, d_model)
         self.positional_encoding = PositionalEncoding(d_model, dropout=dropout)
 
-    def forward(self,
-                src: Tensor,
-                trg: Tensor,
-                src_mask: Tensor,
-                tgt_mask: Tensor,
-                src_padding_mask: Tensor,
-                tgt_padding_mask: Tensor,
-                memory_key_padding_mask: Tensor):
+    def forward(
+        self,
+        src: Tensor,
+        trg: Tensor,
+        src_mask: Tensor,
+        tgt_mask: Tensor,
+        src_padding_mask: Tensor,
+        tgt_padding_mask: Tensor,
+        memory_key_padding_mask: Tensor,
+    ):
         src_emb = self.positional_encoding(self.src_tok_emb(src))
         tgt_emb = self.positional_encoding(self.tgt_tok_emb(trg))
-        outs = self.transformer(src_emb, tgt_emb, src_mask, tgt_mask, None,
-                                src_padding_mask, tgt_padding_mask, memory_key_padding_mask)
+        outs = self.transformer(
+            src_emb,
+            tgt_emb,
+            src_mask,
+            tgt_mask,
+            None,
+            src_padding_mask,
+            tgt_padding_mask,
+            memory_key_padding_mask,
+        )
         return self.generator(outs)
 
     def encode(self, src: Tensor, src_mask: Tensor):
@@ -363,11 +380,7 @@ def get_bleu_score(tgt, pred, vocab):
 
 
 # function to generate output sequence using greedy algorithm
-def greedy_decode(model: nn.Module,
-                  src: Tensor,
-                  src_mask: Tensor,
-                  max_len: int,
-                  start_symbol: int) -> Tensor:
+def greedy_decode(model: nn.Module, src: Tensor, src_mask: Tensor, max_len: int, start_symbol: int) -> Tensor:
     """
     预测所使用的贪婪解码算法
     Args:
@@ -415,7 +428,13 @@ def translate(model: torch.nn.Module, src_sentence: str, tokenizer, vocab, devic
     num_tokens = src.shape[0]
     src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool)
     tgt_tokens = greedy_decode(
-        model, src, src_mask, max_len=num_tokens + 5, start_symbol=BOS_IDX, device=device).flatten()
+        model,
+        src,
+        src_mask,
+        max_len=num_tokens + 5,
+        start_symbol=BOS_IDX,
+        device=device,
+    ).flatten()
     return " ".join(vocab.lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
 
 
@@ -452,8 +471,13 @@ if __name__ == "__main__":
     # ------------------------ #
 
     # 构建数据集
-    dataset = TranslationDataset(file_path=args.data_dir, src_lang=args.src_lang, tgt_lang=args.tgt_lang,
-                                 src_dict=args.src_dict, tgt_dict=args.tgt_dict)
+    dataset = TranslationDataset(
+        file_path=args.data_dir,
+        src_lang=args.src_lang,
+        tgt_lang=args.tgt_lang,
+        src_dict=args.src_dict,
+        tgt_dict=args.tgt_dict,
+    )
     print(dataset)
     # 保存 vocab
     with open(output_dir / "src_dict.txt", "w+", encoding="utf-8") as f:
@@ -464,27 +488,48 @@ if __name__ == "__main__":
     # 划分训练、验证、测试集，分批
     indices = np.arange(len(dataset))
     np.random.shuffle(indices)
-    train_sampler = BatchSampler(indices[:-(args.val_size + args.test_size)], args.batch_size, False)
-    val_sampler = BatchSampler(indices[-(args.val_size + args.test_size):-args.test_size], args.batch_size, False)
-    test_sampler = BatchSampler(indices[-args.test_size:], batch_size=1, drop_last=False)
+    train_sampler = BatchSampler(indices[: -(args.val_size + args.test_size)], args.batch_size, False)
+    val_sampler = BatchSampler(
+        indices[-(args.val_size + args.test_size) : -args.test_size],
+        args.batch_size,
+        False,
+    )
+    test_sampler = BatchSampler(indices[-args.test_size :], batch_size=1, drop_last=False)
 
     # 生成数据迭代器
-    train_db = DataLoader(dataset, batch_sampler=train_sampler, num_workers=args.n_workers, collate_fn=collate_fn)
-    val_db = DataLoader(dataset, batch_sampler=val_sampler, num_workers=args.n_workers, collate_fn=collate_fn)
-    test_db = DataLoader(dataset, batch_sampler=test_sampler, num_workers=args.n_workers, collate_fn=collate_fn)
+    train_db = DataLoader(
+        dataset,
+        batch_sampler=train_sampler,
+        num_workers=args.n_workers,
+        collate_fn=collate_fn,
+    )
+    val_db = DataLoader(
+        dataset,
+        batch_sampler=val_sampler,
+        num_workers=args.n_workers,
+        collate_fn=collate_fn,
+    )
+    test_db = DataLoader(
+        dataset,
+        batch_sampler=test_sampler,
+        num_workers=args.n_workers,
+        collate_fn=collate_fn,
+    )
 
     # ------------------------ #
     # Build Model
     # ------------------------ #
 
-    model = Transformer(args.n_enc_layers,
-                        args.n_dec_layers,
-                        args.d_model,
-                        args.n_heads,
-                        len(dataset.src_vocab),
-                        len(dataset.tgt_vocab),
-                        args.d_ff,
-                        args.dropout).to(args.device)
+    model = Transformer(
+        args.n_enc_layers,
+        args.n_dec_layers,
+        args.d_model,
+        args.n_heads,
+        len(dataset.src_vocab),
+        len(dataset.tgt_vocab),
+        args.d_ff,
+        args.dropout,
+    ).to(args.device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98), eps=1e-9)
     criterion = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
@@ -500,10 +545,16 @@ if __name__ == "__main__":
     # ---------------------------- #
 
     print("Start training...")
-    BEST_BLEU = 0.  # 记录最优准确率的 epoch
+    BEST_BLEU = 0.0  # 记录最优准确率的 epoch
     # 记录每个 step 的损失喝准确率
-    LOSS = {"train": [[] for _ in range(args.epochs)], "val": [[] for _ in range(args.epochs)]}
-    BLEU = {"train": [[] for _ in range(args.epochs)], "val": [[] for _ in range(args.epochs)]}
+    LOSS = {
+        "train": [[] for _ in range(args.epochs)],
+        "val": [[] for _ in range(args.epochs)],
+    }
+    BLEU = {
+        "train": [[] for _ in range(args.epochs)],
+        "val": [[] for _ in range(args.epochs)],
+    }
 
     st = time.time()
     for epoch in range(start_epoch + 1, args.epochs):
@@ -518,7 +569,15 @@ if __name__ == "__main__":
                 src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
 
                 # 计算每个词的概率
-                logits = model(src, tgt_input, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask, src_padding_mask)
+                logits = model(
+                    src,
+                    tgt_input,
+                    src_mask,
+                    tgt_mask,
+                    src_padding_mask,
+                    tgt_padding_mask,
+                    src_padding_mask,
+                )
 
                 optimizer.zero_grad()  # 初始化优化器梯度
 
@@ -538,8 +597,12 @@ if __name__ == "__main__":
                 BLEU["train"][epoch].append(bleu)
                 # 更新进度条
                 pbar.update(1)
-                pbar.set_postfix({"loss": f"{np.mean(LOSS['train'][epoch]).item():.4f}",
-                                  "bleu_score": f"{np.mean(BLEU['train'][epoch]).item() * 100:.2f}%"})
+                pbar.set_postfix(
+                    {
+                        "loss": f"{np.mean(LOSS['train'][epoch]).item():.4f}",
+                        "bleu_score": f"{np.mean(BLEU['train'][epoch]).item() * 100:.2f}%",
+                    }
+                )
 
             # 训练完一个 epoch 后进行验证
             model.eval()
@@ -549,7 +612,15 @@ if __name__ == "__main__":
 
                 src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
 
-                logits = model(src, tgt_input, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask, src_padding_mask)
+                logits = model(
+                    src,
+                    tgt_input,
+                    src_mask,
+                    tgt_mask,
+                    src_padding_mask,
+                    tgt_padding_mask,
+                    src_padding_mask,
+                )
 
                 tgt_out = tgt[1:, :]
                 loss = criterion(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
@@ -562,23 +633,39 @@ if __name__ == "__main__":
                 LOSS["val"][epoch].append(loss.item())
                 BLEU["val"][epoch].append(bleu)
                 # 更新进度条
-                pbar.set_postfix({"loss": f"{np.mean(LOSS['train'][epoch]).item():.4f}",
-                                  "bleu_score": f"{np.mean(BLEU['train'][epoch]).item() * 100:.2f}%",
-                                  "loss_val": f"{np.mean(LOSS['val'][epoch]).item():.4f}",
-                                  "bleu_score_val": f"{np.mean(BLEU['val'][epoch]).item() * 100:.2f}%"})
+                pbar.set_postfix(
+                    {
+                        "loss": f"{np.mean(LOSS['train'][epoch]).item():.4f}",
+                        "bleu_score": f"{np.mean(BLEU['train'][epoch]).item() * 100:.2f}%",
+                        "loss_val": f"{np.mean(LOSS['val'][epoch]).item():.4f}",
+                        "bleu_score_val": f"{np.mean(BLEU['val'][epoch]).item() * 100:.2f}%",
+                    }
+                )
 
             # 判断验证数据平均准确率是否大于最优准确率，若更高则保存 best_model.pth
             if np.mean(BLEU["val"][epoch]).item() > BEST_BLEU:
                 BEST_BLEU = np.mean(BLEU["val"][epoch]).item()
-                torch.save({"model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": epoch},
-                           output_dir / "best_model.pth")
+                torch.save(
+                    {
+                        "model": model.state_dict(),
+                        "optimizer": optimizer.state_dict(),
+                        "epoch": epoch,
+                    },
+                    output_dir / "best_model.pth",
+                )
 
     et = time.time()
     print("Time taken: %ds" % (et - st))
 
     # 保存最终的模型权重
-    torch.save({"model": model.state_dict(), "optimizer": optimizer.state_dict(), "epoch": args.epochs},
-               output_dir / "final_model.pth")
+    torch.save(
+        {
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "epoch": args.epochs,
+        },
+        output_dir / "final_model.pth",
+    )
     print("模型权重保存到：%s" % output_dir)
     # 保存损失、准确率
     print("训练、验证损失和准确率保存到：%s" % (output_dir / "metrics.json"))
@@ -623,7 +710,15 @@ if __name__ == "__main__":
 
             src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
 
-            logits = model(src, tgt_input, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask, src_padding_mask)
+            logits = model(
+                src,
+                tgt_input,
+                src_mask,
+                tgt_mask,
+                src_padding_mask,
+                tgt_padding_mask,
+                src_padding_mask,
+            )
 
             tgt_out = tgt[1:, :]
             loss = criterion(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
@@ -633,8 +728,7 @@ if __name__ == "__main__":
             bleu = get_bleu_score(tgt_out, pred, dataset.tgt_vocab)
 
             pbar.update(1)
-            pbar.set_postfix({"loss_val": f"{loss.item():.4f}",
-                              "bleu_val": f"{bleu * 100:.2f}%"})
+            pbar.set_postfix({"loss_val": f"{loss.item():.4f}", "bleu_val": f"{bleu * 100:.2f}%"})
 
     # ------------------------ #
     # Prediction
@@ -648,5 +742,8 @@ if __name__ == "__main__":
         tgt_tokens = greedy_decode(model, src, src_mask, num_tokens + 5, BOS_IDX)
 
         print("原始翻译：", " ".join(dataset.tgt_vocab.lookup_tokens(tgt.flatten().tolist())))
-        print("模型翻译：", " ".join(dataset.tgt_vocab.lookup_tokens(tgt_tokens.flatten().tolist())))
+        print(
+            "模型翻译：",
+            " ".join(dataset.tgt_vocab.lookup_tokens(tgt_tokens.flatten().tolist())),
+        )
         print()

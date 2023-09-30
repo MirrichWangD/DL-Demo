@@ -31,12 +31,9 @@ from tqdm import tqdm
 class VisionTransformer(object):
     _default = {
         "cuda": torch.cuda.is_available(),  # 自动判断是否使用 CUDA
-
         "epochs": 20,  # 训练世纪
-
         "save_epochs": 5,  # 每隔若干个周期保存模型权重（未写相关代码）
-
-        "save_dir": "./logs"  # 模型权重保存路径
+        "save_dir": "./logs",  # 模型权重保存路径
     }
 
     def __init__(self, model, criterion, optimizer, **args):
@@ -99,8 +96,12 @@ class VisionTransformer(object):
                     correct += torch.eq(output.argmax(-1), y).sum().item()
 
                     pbar.update(1)
-                    pbar.set_postfix({"loss": "%.4f" % loss[-1],
-                                      "accuracy": "%.2f%%" % (correct / total * 100)})
+                    pbar.set_postfix(
+                        {
+                            "loss": "%.4f" % loss[-1],
+                            "accuracy": "%.2f%%" % (correct / total * 100),
+                        }
+                    )
 
                 LOSS.append(torch.mean(torch.tensor(loss)).item())
                 ACCURACY.append(correct / total)
@@ -108,14 +109,26 @@ class VisionTransformer(object):
                     val_loss, val_accuracy = self.eval(valid_data)
                     VAL_LOSS.append(val_loss)
                     VAL_ACCURACY.append(val_accuracy)
-                    pbar.set_postfix({"loss": "%.4f" % LOSS[-1],
-                                      "accuracy": "%.2f%%" % (ACCURACY[-1] * 100),
-                                      "val_loss": "%.4f" % VAL_LOSS[-1],
-                                      "val_accuracy": "%.2f%%" % (VAL_ACCURACY[-1] * 100)})
+                    pbar.set_postfix(
+                        {
+                            "loss": "%.4f" % LOSS[-1],
+                            "accuracy": "%.2f%%" % (ACCURACY[-1] * 100),
+                            "val_loss": "%.4f" % VAL_LOSS[-1],
+                            "val_accuracy": "%.2f%%" % (VAL_ACCURACY[-1] * 100),
+                        }
+                    )
 
-        torch.save(self.model.state_dict(), os.path.join(self.save_dir, "CIFAR100_ViT_weights.pth"))  # 模型权重保存
+        torch.save(
+            self.model.state_dict(),
+            os.path.join(self.save_dir, "CIFAR100_ViT_weights.pth"),
+        )  # 模型权重保存
 
-        return {"loss": LOSS, "accuracy": ACCURACY, "val_loss": VAL_LOSS, "val_accuracy": VAL_ACCURACY}
+        return {
+            "loss": LOSS,
+            "accuracy": ACCURACY,
+            "val_loss": VAL_LOSS,
+            "val_accuracy": VAL_ACCURACY,
+        }
 
 
 if __name__ == "__main__":
@@ -143,10 +156,7 @@ if __name__ == "__main__":
 
     # ---------------- 加载数据 ------------------ #
 
-    transform = transforms.Compose(
-        [transforms.ToTensor(),
-         transforms.Resize(image_size)]
-    )
+    transform = transforms.Compose([transforms.ToTensor(), transforms.Resize(image_size)])
     # train_data = ImageFolder(root=os.path.join(path, 'train'), transform=transform)
     # test_data = ImageFolder(root=os.path.join(path, 'test'), transform=transform)
     # 构造数据集，需要注意在 data_dir 下若使用 CIFAR100数据集，请放置 “cifar-100-python.tar.gz" 和 "cifar-100-python" 两个文件
@@ -172,9 +182,7 @@ if __name__ == "__main__":
         sampler=indices_valid,
         num_workers=num_workers,
     )
-    test_db = data.DataLoader(
-        dataset=test_data, batch_size=batch_size, num_workers=num_workers
-    )
+    test_db = data.DataLoader(dataset=test_data, batch_size=batch_size, num_workers=num_workers)
     print(f"Train: (%i, %i, %i, %i)" % (len(train_data), num_channels, *image_size))
     print(f"Valid: (%i, %i, %i, %i)" % (len(indices_valid), num_channels, *image_size))
     print(f"Test: (%i, %i, %i, %i)" % (len(test_data), num_channels, *image_size))

@@ -34,12 +34,14 @@ for s in subset:
         x1, y1, w, h = ann["bbox"]
         x2 = x1 + w
         y2 = y1 + h
-        anns.append({
-            "id": ann["id"],
-            "filename": str(root / s / version / images[images["id"] == ann["image_id"]]["file_name"].item()),
-            "points": ",".join([str(x1), str(y1), str(x2), str(y2)]),
-            "label": categories[categories["id"] == ann["category_id"]]["name"].item()
-        })
+        anns.append(
+            {
+                "id": ann["id"],
+                "filename": str(root / s / version / images[images["id"] == ann["image_id"]]["file_name"].item()),
+                "points": ",".join([str(x1), str(y1), str(x2), str(y2)]),
+                "label": categories[categories["id"] == ann["category_id"]]["name"].item(),
+            }
+        )
 anns = pd.DataFrame(sorted(anns, key=lambda i: i["id"]))
 anns.to_sql("test_detection", index=False, con=engine, if_exists="replace")
 
