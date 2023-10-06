@@ -1,6 +1,6 @@
 # 自定义目录
 data/
-checkpoints/
+ckpt/
 output/
 # Byte-compiled / optimized / DLL files
 __pycache__/
