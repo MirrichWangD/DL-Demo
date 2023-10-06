@@ -1,0 +1,206 @@
+Building prefix dict from the default dictionary ...
+Loading model from cache C:\Users\MIRRIC~1\AppData\Local\Temp\jieba.cache
+Loading model cost 0.325 seconds.
+Prefix dict has been built successfully.
+英文字典长度： 7191
+中文字典长度： 12523
+英文输入词向量最长长度： 36
+中文输出词向量最长长度： 31
+Epoch 1/5: 100%|██████████| 176/176 [01:27<00:00,  2.00Batch/s, loss=4.9953, PPL=147.7232, val_loss=4.4270, val_PPL=83.6805]
+Epoch 2/5: 100%|██████████| 176/176 [01:22<00:00,  2.14Batch/s, loss=3.6695, PPL=39.2311, val_loss=3.8310, val_PPL=46.1098]
+Epoch 3/5: 100%|██████████| 176/176 [01:23<00:00,  2.11Batch/s, loss=2.7827, PPL=16.1622, val_loss=3.6294, val_PPL=37.6904]
+Epoch 4/5: 100%|██████████| 176/176 [01:22<00:00,  2.14Batch/s, loss=2.2106, PPL=9.1208, val_loss=3.5984, val_PPL=36.5392]
+Epoch 5/5: 100%|██████████| 176/176 [01:29<00:00,  1.97Batch/s, loss=1.8488, PPL=6.3525, val_loss=3.6769, val_PPL=39.5255]
+测试损失:3.5555
+input: <SOS> my job is to wash dishes . <EOS>
+target: <SOS> 我 的 工作 是 洗 盘子 。 <EOS>
+output: <UNK> 我 的 工作 是 洗碗 。 <EOS>
+input: <SOS> no one knows . <EOS>
+target: <SOS> 谁 也 不 知道 。 <EOS>
+output: <UNK> 没有 人 知道 。 <EOS>
+input: <SOS> spanish is her native language . <EOS>
+target: <SOS> 西班牙语 是 她 的 母语 。 <EOS>
+output: <UNK> 她 是 她 的 母语 。 <EOS>
+input: <SOS> tom seems to really enjoy being in boston . <EOS>
+target: <SOS> 汤姆 看来 真 喜欢 待 在 波士顿 。 <EOS>
+output: <UNK> 汤姆 似乎 在 波士顿 波士顿 。 <EOS>
+input: <SOS> what 's so fun about taking pictures of trains ? <EOS>
+target: <SOS> 拍 火车 的 照片 什么 的 ， 有 什么 好玩 的 呀 ？ <EOS>
+output: <UNK> 请问 什么 什么 什么 ？ <EOS>
+input: <SOS> they want more . <EOS>
+target: <SOS> 他们 想要 更 多 。 <EOS>
+output: <UNK> 他们 想要 更 多 。 <EOS>
+input: <SOS> this morning , i saw an angel . <EOS>
+target: <SOS> 我 今晨 看见 一位 天使 。 <EOS>
+output: <UNK> 这 早上 我 看到 了 一个 小时 。 <EOS>
+input: <SOS> you should have attended the meeting . <EOS>
+target: <SOS> 你 应该 参加 这个 会议 的 。 <EOS>
+output: <UNK> 你 本 参加 会议 。 <EOS>
+input: <SOS> did you do your homework by yourself ? <EOS>
+target: <SOS> 你 自己 做 回家 作业 的 吗 ? <EOS>
+output: <UNK> 你 自己 自己 做 完 自己 吗 ？ <EOS>
+input: <SOS> the boy carved his name into the tree . <EOS>
+target: <SOS> 男孩 把 他 的 名字 刻 在 树上 。 <EOS>
+output: <UNK> 男孩 男孩 他 的 名字 名字 了 下来 。 <EOS>
+input: <SOS> i want to stay . <EOS>
+target: <SOS> 我 想要 留下 。 <EOS>
+output: <UNK> 我 想 留下 。 <EOS>
+input: <SOS> they drink cola . <EOS>
+target: <SOS> 他们 喝 可口可乐 。 <EOS>
+output: <UNK> 他们 喝 可乐 。 <EOS>
+input: <SOS> the recent coffee shortage brought about many problems . <EOS>
+target: <SOS> 最近 的 咖啡 短缺 带来 了 许多 问题 。 <EOS>
+output: <UNK> 医学 的 问题 许多 问题 许多 问题 。 <EOS>
+input: <SOS> a burglar broke into my house while i was away on a trip . <EOS>
+target: <SOS> 一个 入室 盗窃者 趁 我 去 旅游 的 时候 闯入 了 我家 。 <EOS>
+output: <UNK> 当 我 的 房子 ， 我 被 了 了 了 。 <EOS>
+input: <SOS> i often say that to myself . <EOS>
+target: <SOS> 我常 对 自己 这么 说 。 <EOS>
+output: <UNK> 我 经常 自己 自己 自己 。 <EOS>
+input: <SOS> where is the nearest church ? <EOS>
+target: <SOS> 最近 的 教堂 在 哪里 ？ <EOS>
+output: <UNK> 教堂 在 哪里 ？ <EOS>
+input: <SOS> this is the best restaurant that i know . <EOS>
+target: <SOS> 这 是 我 所 知道 的 最好 的 餐厅 。 <EOS>
+output: <UNK> 这 是 我 知道 的 餐馆 餐馆 。 <EOS>
+input: <SOS> did you leave the window open ? <EOS>
+target: <SOS> 你 让 窗户 开著 吗 ? <EOS>
+output: <UNK> 你 离开 了 窗户 开著 吗 ？ <EOS>
+input: <SOS> someone is watching . <EOS>
+target: <SOS> 有人 在 监视 。 <EOS>
+output: <UNK> 哈哈 在 。 <EOS>
+input: <SOS> this is the stupidest thing i 've ever seen in my entire life . <EOS>
+target: <SOS> 这 是 我 人生 中见 过 最白 癡 的 事 。 <EOS>
+output: <UNK> 这 是 我 的 生活 的 餐馆 。 <EOS>
+input: <SOS> we played basketball yesterday . <EOS>
+target: <SOS> 我们 昨天 打篮球 。 <EOS>
+output: <UNK> 昨天 昨天 踢 了 。 <EOS>
+input: <SOS> they were good . <EOS>
+target: <SOS> 他们 不错 。 <EOS>
+output: <UNK> 他们 很 好 。 <EOS>
+input: <SOS> better luck next time . <EOS>
+target: <SOS> 祝 你 下 一次 好运 。 <EOS>
+output: <UNK> 随时 下 。 <EOS>
+input: <SOS> tom has loved mary for a long time . <EOS>
+target: <SOS> 汤姆 爱 玛丽 很久 了 。 <EOS>
+output: <UNK> 汤姆 已经 了 玛丽 很长 一段时间 。 <EOS>
+input: <SOS> she asked me where i was going . <EOS>
+target: <SOS> 她 问 了 我 要 去 哪里 。 <EOS>
+output: <UNK> 她 问 我 我 在 哪里 。 <EOS>
+input: <SOS> i should 've gone to bed earlier last night . <EOS>
+target: <SOS> 我 昨晚 应该 早点 睡觉 的 。 <EOS>
+output: <UNK> 我 昨晚 睡得 早点 早点 。 <EOS>
+input: <SOS> my father objected to our marriage . <EOS>
+target: <SOS> 我 的 父亲 反对 我们 的 婚姻 。 <EOS>
+output: <UNK> 我 爸爸 反对 我们 的 婚姻 。 <EOS>
+input: <SOS> i did n't go to school last monday . <EOS>
+target: <SOS> 上周 一 我 没 去 上学 。 <EOS>
+output: <UNK> 我 没 去 上学 。 <EOS>
+input: <SOS> would you please write with a ballpoint pen ? <EOS>
+target: <SOS> 你 能 用 圆珠笔 写 吗 ？ <EOS>
+output: <UNK> 请 你 把 笔 吗 吗 ？ <EOS>
+input: <SOS> the boy made his parents happy . <EOS>
+target: <SOS> 这个 男孩 让 他 的 父母 高兴 。 <EOS>
+output: <UNK> 这个 男孩 让 他 的 父母 。 <EOS>
+input: <SOS> can i come to your place ? <EOS>
+target: <SOS> 我能 去 你 那 吗 ？ <EOS>
+output: <UNK> 我能 可以 你 的 地方 吗 ？ <EOS>
+input: <SOS> there is food on the desk . <EOS>
+target: <SOS> 书桌上 有 食物 。 <EOS>
+output: <UNK> 书桌上 书桌上 书桌上 。 <EOS>
+input: <SOS> she was holding a small parasol in her hand . <EOS>
+target: <SOS> 她 手里 握 着 一把 小 阳伞 。 <EOS>
+output: <UNK> 她 在 她 的 的 的 一个 。 <EOS>
+input: <SOS> why do n't we order pizza ? <EOS>
+target: <SOS> 为什么 我们 不订 披萨 呢 ？ <EOS>
+output: <UNK> 我们 不订些 批萨 批萨 呢 ？ <EOS>
+input: <SOS> the quickest means of travel is by plane . <EOS>
+target: <SOS> 旅行 最快 的 方式 是 乘飞机 。 <EOS>
+output: <UNK> 这座 的 的 飞机 乘飞机 乘飞机 。 <EOS>
+input: <SOS> she stood in front of the mirror . <EOS>
+target: <SOS> 她 站 在 镜子 前 。 <EOS>
+output: <UNK> 她 在 镜子 镜子 。 <EOS>
+input: <SOS> i 'll send a letter to my mother . <EOS>
+target: <SOS> 我会 给 我 的 母亲 寄 封信 。 <EOS>
+output: <UNK> 我会 把 我 一封信 给 我 的 母亲 。 <EOS>
+input: <SOS> what time did you get up this morning ? <EOS>
+target: <SOS> 你 今天 几点 起 的 床 ？ <EOS>
+output: <UNK> 今天 早上 起床 时候 起床 ？ <EOS>
+input: <SOS> my blood pressure is low . <EOS>
+target: <SOS> 我 的 血压 很 低 。 <EOS>
+output: <UNK> 我 的 血压 是 低 。 <EOS>
+input: <SOS> i hope i will have a chance to see you next time i 'm in new york . <EOS>
+target: <SOS> 希望 下次 我 在 纽约 还 可以 有 机会 见到 你 。 <EOS>
+output: <UNK> 我 希望 我会 时候 时候 时候 时候 ， 我会 我 我 。 <EOS>
+input: <SOS> the importation of rare wild animals to this country is strictly prohibited . <EOS>
+target: <SOS> 该国 严禁 进口 稀有 野生动物 。 <EOS>
+output: <UNK> 上海 国家 国家 国家 是 乘飞机 。 <EOS>
+input: <SOS> you work as hard as he did at your age . <EOS>
+target: <SOS> 你 跟 他 在 你 这个 年纪 时 一样 努力 工作 。 <EOS>
+output: <UNK> 你 工作 他 你 年龄 年龄 。 <EOS>
+input: <SOS> tom is a magician . <EOS>
+target: <SOS> 汤姆 是 魔法师 。 <EOS>
+output: <UNK> 汤姆 是 魔术师 魔术师 魔术师 。 <EOS>
+input: <SOS> it will be spring soon . <EOS>
+target: <SOS> 春天 快来 了 。 <EOS>
+output: <UNK> 很快 很快 就 会 很快 。 <EOS>
+input: <SOS> he hurried to the station so he would n't miss the train . <EOS>
+target: <SOS> 为了 不错 过 火车 ， 他 匆匆 赶往 了 车站 。 <EOS>
+output: <UNK> 他 把 车站 ， 所以 火车 火车 火车 火车 。 <EOS>
+input: <SOS> do you understand ? <EOS>
+target: <SOS> 懂 了 吗 ？ <EOS>
+output: <UNK> 懂 懂 吗 ？ <EOS>
+input: <SOS> is there someone who could help me ? <EOS>
+target: <SOS> 有 谁 可以 帮 我 吗 ？ <EOS>
+output: <UNK> 有人 可以 帮 我 吗 ？ <EOS>
+input: <SOS> she always looked happy , but never was . <EOS>
+target: <SOS> 她 总是 看起来 很 快乐 ， 但 实际上 从来不 快乐 。 <EOS>
+output: <UNK> 她 毫无 看起来 很 开心 ， 但是 永远 。 <EOS>
+input: <SOS> what you said about tom is n't true . <EOS>
+target: <SOS> 你 说 的 关于 汤姆 的话 不是 真的 。 <EOS>
+output: <UNK> 你 说 的话 汤姆 不是 真的 。 <EOS>
+input: <SOS> the famous pianist smiled . <EOS>
+target: <SOS> 著名 的 钢琴家 露出 了 微笑 。 <EOS>
+output: <UNK> 绿队 钢琴家 了 。 <EOS>
+input: <SOS> be punctual . <EOS>
+target: <SOS> 要 守时 ！ <EOS>
+output: <UNK> 现实 。 <EOS>
+input: <SOS> this guy looks like a fox . <EOS>
+target: <SOS> 这 家伙 像 个 狐狸 。 <EOS>
+output: <UNK> 这个 男孩子 看起来 像 个 。 <EOS>
+input: <SOS> he earns a good salary . <EOS>
+target: <SOS> 他 收入 可观 。 <EOS>
+output: <UNK> 他 很 愉快 。 <EOS>
+input: <SOS> could you do me a favor ? <EOS>
+target: <SOS> 请 你 帮 我 一个 忙 好 吗 ？ <EOS>
+output: <UNK> 你 能 我 一个 人情 吗 ？ <EOS>
+input: <SOS> people of your age often have this problem . <EOS>
+target: <SOS> 您 这个 年龄 的 人 经常 有 这个 问题 。 <EOS>
+output: <UNK> 你 的 你 的 老师 解决 这个 问题 。 <EOS>
+input: <SOS> i have difficulty chewing . <EOS>
+target: <SOS> 我 不太能 嚼 东西 。 <EOS>
+output: <UNK> 我 有 几支 。 <EOS>
+input: <SOS> a persian cat was sleeping under the table . <EOS>
+target: <SOS> 波斯猫 在 桌子 下面 睡觉 。 <EOS>
+output: <UNK> 一架 猫 猫 在 桌子 底下 。 <EOS>
+input: <SOS> see how high you can jump . <EOS>
+target: <SOS> 看看 你 能 跳 多 高 。 <EOS>
+output: <UNK> 再见 怎么 能 跳 。 <EOS>
+input: <SOS> please knock before you come in . <EOS>
+target: <SOS> 进来 之前 请 敲门 。 <EOS>
+output: <UNK> 请进来 之前 你 。 <EOS>
+input: <SOS> he did n't hear his name called . <EOS>
+target: <SOS> 他 没 听见 有人 叫 他 的 名字 。 <EOS>
+output: <UNK> 他 没 听到 他 的 名字 名字 。 <EOS>
+input: <SOS> am i dead ? <EOS>
+target: <SOS> 我 死 了 吗 ？ <EOS>
+output: <UNK> 我 死 了 吗 ？ <EOS>
+input: <SOS> i had no idea there 'd be this many people here . <EOS>
+target: <SOS> 我 没想到 这里 有 这么 多人 。 <EOS>
+output: <UNK> 我 在 这 这 这 这 这 这 这 。 <EOS>
+input: <SOS> where is the ticket window ? <EOS>
+target: <SOS> 售票 窗口 在 哪里 ？ <EOS>
+output: <UNK> 最近 在 哪里 ？ <EOS>
+input: <SOS> lying is wrong . <EOS>
+target: <SOS> 说谎 不好 。 <EOS>
+output: <UNK> 人生 错 了 。 <EOS>
