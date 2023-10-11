@@ -12,6 +12,7 @@
 
 import os
 import time
+import json
 import pickle
 from collections import OrderedDict
 
@@ -33,30 +34,33 @@ import torchsummary
 
 # Global Constant
 N_WORKERS = 0
-BATCH_SIZE = 256
-EPOCHS = 10
+BATCH_SIZE = 128
+EPOCHS = 100
 VAL_SIZE = 5000
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
+plt.rcParams["font.family"] = ["Times New Roman"]
 
 """===========================
 @@@ Dataset and Processing
 +++++++++++++++++++++++++++"""
 
 
-def load_meta(file: str):
+def load_meta(file_path: str):
     """
-    _summary_
+    读取 meta 文件函数
 
     Args:
-        file (str): _description_
+        file_path (str): 文件路径
     """
-    with open(file, "rb") as fp:
+    with open(file_path, "rb") as fp:
         d = pickle.load(fp, encoding="iso-8859-1")
     return d
 
 
 class CIFAR10(Dataset):
+    """构建CIFAR10数据集"""
+
     name = "CIFAR10"
     base_folder = "cifar-10-batches-py"
 
@@ -71,6 +75,13 @@ class CIFAR10(Dataset):
     test_list = ["test_batch"]
 
     def __init__(self, root: str, train: bool = True) -> None:
+        """
+        构造函数
+
+        Args:
+            root (str): 数据集路径字符串
+            train (bool, optional): 是否加载“训练”集数据. Defaults to True.
+        """
         super().__init__()
 
         self.data = []
@@ -89,10 +100,14 @@ class CIFAR10(Dataset):
             self.labels.extend(meta["labels"])
 
     def __len__(self):
+        """返回数据集长度"""
         return len(self.data)
 
     def __getitem__(self, idx) -> tuple:
-        return torch.tensor(self.data[idx]).type(torch.FloatTensor), torch.tensor(self.labels[idx]).type(torch.LongTensor)
+        """返回对应索引数据"""
+        data = torch.tensor(self.data[idx]).type(torch.FloatTensor)
+        label = torch.tensor(self.labels[idx]).type(torch.LongTensor)
+        return data, label
 
 
 """====================
@@ -112,6 +127,17 @@ class DenseNet121(nn.Module):
         drop_rate: float = 0,
         n_classes: int = 1000,
     ) -> None:
+        """
+        DenseNet构造函数
+
+        Args:
+            growth_rate (int, optional): k通道增长倍率. Defaults to 32.
+            n_layers (tuple, optional): 每一层DenseBlock的数量. Defaults to (6, 12, 24, 16).
+            n_init_features (int, optional): 特征卷积层输出通道数. Defaults to 64.
+            bn_size (int, optional): DenseLayer中BN层尺寸. Defaults to 4.
+            drop_rate (float, optional): drouput比例. Defaults to 0.
+            n_classes (int, optional): 输出层神经元数量，类别数. Defaults to 1000.
+        """
         super(DenseNet121, self).__init__()
         # input
         self.features = nn.Sequential(
@@ -158,8 +184,6 @@ class DenseNet121(nn.Module):
         # Final Classifier -> Linear Layer
         self.classifier = nn.Linear(n_features, n_classes)
 
-        self.drop_rate = drop_rate
-
     def forward(self, x: Tensor) -> Tensor:
         features = [self.features(x)]
 
@@ -182,7 +206,20 @@ class DenseNet121(nn.Module):
 ==================================="""
 
 
-def process(model, data_iterator, criterion, optimizer=None, pbar=None):
+def process(model: nn.Module, data_iterator: DataLoader, criterion, optimizer=None, pbar=None):
+    """
+    模型推理函数
+
+    Args:
+        model (nn.Module): 模型对象
+        data_iterator (DataLoader): 数据迭代器
+        criterion (nn.modules.loss.*): 损失函数对象
+        optimizer (torch.optim.*, optional): 优化器对象. Defaults to None.
+        pbar (tqdm.std.tqdm, optional): 进度条对象. Defaults to None.
+
+    Returns:
+        (list, list): 推理过程的损失和准确率
+    """
     if optimizer:
         model.train()
     else:
@@ -213,36 +250,67 @@ def process(model, data_iterator, criterion, optimizer=None, pbar=None):
 
 
 def main():
+    # 由于CIFAR10图片尺寸为32x32，根据原文给出实验表格模型Depth=30，减去输入的Conv0、TransitionLayer和最后的Linear层，
+    # 参考实验表格的层数规律，给出(5, 10, 20)的层数搭配
     model = DenseNet121(12, (5, 10, 20), n_classes=10, drop_rate=0.1).to(DEVICE)
     torchsummary.summary(model, input_size=(3, 32, 32))
 
+    # 构造训练、测试数据
     train_data = CIFAR10(root="./data", train=True)
     test_data = CIFAR10(root="./data", train=False)
-
+    # 生成训练、评估、测试数据迭代器
     indices = torch.randperm(len(train_data))
     train_db = DataLoader(train_data, batch_size=BATCH_SIZE, num_workers=N_WORKERS, sampler=indices[:-VAL_SIZE])
     valid_db = DataLoader(train_data, batch_size=BATCH_SIZE, num_workers=N_WORKERS, sampler=indices[-VAL_SIZE:])
     test_db = DataLoader(test_data, batch_size=1, num_workers=N_WORKERS)
 
+    # 按照原文设置优化器和损失函数
     optimizer = torch.optim.SGD(model.parameters(), lr=0.3, momentum=0.9, weight_decay=1e-4)
     criterion = torch.nn.CrossEntropyLoss()
 
+    best_valid_loss = float("inf")
+    train_history = {"loss": [], "acc": [], "loss_val": [], "acc_val": []}
+    # 开始训练和评估
     st = time.time()
     for epoch in range(EPOCHS):
         with tqdm(total=len(train_db), desc=f"Epoch {epoch+1}/{EPOCHS}") as pbar:
             train_loss, train_acc = process(model, train_db, criterion, optimizer, pbar=pbar)
             valid_loss, valid_acc = process(model, valid_db, criterion, pbar=pbar)
 
+            train_history["loss"].append(train_loss)
+            train_history["acc"].append(train_acc)
+            train_history["loss_val"].append(valid_loss)
+            train_history["acc_val"].append(valid_acc)
+            if np.mean(valid_loss) < best_valid_loss:
+                best_valid_loss = np.mean(valid_loss)
+                torch.save(model.state_dict(), "./ckpt/best_model.pt")
             pbar.set_postfix(
                 {
                     "loss": f"{np.mean(train_loss):.4f}",
                     "acc": f"{np.mean(train_acc) * 100:.2f}%",
-                    "val_loss": f"{np.mean(valid_loss):.4f}",
-                    "val_acc": f"{np.mean(valid_acc):.2f}%",
+                    "loss_val": f"{np.mean(valid_loss):.4f}",
+                    "acc_val": f"{np.mean(valid_acc) * 100:.2f}%",
                 }
             )
     et = time.time()
     print("Time Taken: %fs" % (et - st))
+
+    torch.save(model.state_dict(), "./ckpt/final_model.pt")
+
+    with open("./ckpt/train_history.json", "w+", encoding="utf-8") as fp:
+        json.dump(train_history, fp)
+
+    plt.figure(figsize=(6, 4))
+    plt.title("Train Loss")
+    plt.plot(list(map(lambda i: np.mean(i), train_history["loss"])), "b-", label="Train")
+    plt.plot(list(map(lambda i: np.mean(i), train_history["loss_val"])), "r-", label="Valid")
+    plt.savefig("./ckpt/train_loss.png")
+
+    plt.figure(figsize=(6, 4))
+    plt.title("Train Acc")
+    plt.plot(list(map(lambda i: np.mean(i), train_history["acc"])), "b-", label="Train")
+    plt.plot(list(map(lambda i: np.mean(i), train_history["acc_val"])), "r-", label="Valid")
+    plt.savefig("./ckpt/train_acc.png")
 
 
 if __name__ == "__main__":
