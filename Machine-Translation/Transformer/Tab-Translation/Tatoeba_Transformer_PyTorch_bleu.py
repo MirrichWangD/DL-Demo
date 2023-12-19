@@ -13,8 +13,8 @@
     因此需要提前安装对应语言模块，如 英文-简中 翻译，需要安装 zh_core_web_sm 和 en_core_web_sm，这些均可以在下方 SPACY 变量进行调整
     ！改动：代码训练、验证过程中计算的准确率调整为BLEU计算
 实验设备：
-    CPU: 10th Gen Intel(R) Core(TM) i5-10400
-    GPU:  Nvidia GeForce RTX2060-Super 8GB
+    CPU:    10th Gen Intel(R) Core(TM) i5-10400
+    GPU:    Nvidia GeForce RTX2060-Super 8GB
 依赖模块（带*为可以最新版本）：
     torch       1.12.1+cu116
     torchtext   0.13.1
@@ -63,7 +63,12 @@ PAD_IDX, UNK_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
 SPECIALS = ["<pad>", "<unk>", "<bos>", "<eos>"]
 # 定义 spacy 语言模型库，用于分词，该部分可以自行增加
 # 注意！运行时请确保输入的 src_lang 和 tgt_lang 能够在此查询到相对应的 Spacy 语言模块，否则会构造数据集时报错
-SPACY = {"de": "de_core_news_sm", "en": "en_core_web_sm", "zh": "zh_core_web_sm"}
+SPACY = {
+    "de": "de_core_news_sm",  # German 德语
+    "en": "en_core_web_sm",  # English 英语
+    "zh": "zh_core_web_sm",  # Chinese 简中
+    "fr": "fr_core_news_sm",  # French 法语
+}
 
 """+++++++++++++++++++++++++
 @@@ 变量对象定义
@@ -83,6 +88,7 @@ def get_args_parser():
     parser.add_argument("--tgt_lang", default="zh", type=str, help="输出语言，如zh：简中")
     parser.add_argument("--src_dict", default=None, type=str, help="输入语言词典txt文件")
     parser.add_argument("--tgt_dict", default=None, type=str, help="输出语言词典txt文件")
+    parser.add_argument("--max_len", default=40, type=int, help="句子向量最大长度")
     parser.add_argument("--min_freq", default=1, type=str, help="词频最少数量，小于该数将不会加载进词汇中")
     parser.add_argument("--val_size", default=1000, type=int, help="验证数据量")
     parser.add_argument("--test_size", default=100, type=int, help="测试数据量")
@@ -94,15 +100,16 @@ def get_args_parser():
     parser.add_argument("--d_model", default=512, type=int, help="Embedding嵌入层维数")
     parser.add_argument("--d_ff", default=2048, type=int, help="FFN维数")
     parser.add_argument("--dropout", default=0.1, type=float, help="LN层Dropout比例")
-    parser.add_argument("--resume", default=None, type=str, help="导入模型权重路径")
+    parser.add_argument("--resume", default="./output/eng-zh_bleu/final_model.pth", type=str, help="导入模型权重路径")
 
     # 训练参数
-    parser.add_argument("--epochs", default=100, type=int, help="训练轮数")
+    parser.add_argument("--mode", default="eval", choices=["train", "eval"], help="脚本模式，train：训练；eval：验证")
+    parser.add_argument("--epochs", default=0, type=int, help="训练轮数")
     parser.add_argument("--lr", default=0.0001, type=float, help="学习率")
     parser.add_argument("--batch_size", default=64, type=int, help="批数量")
     parser.add_argument("--n_workers", default=0, type=int, help="读取数据进程数，使用交互式窗口运行时请设置为0")
     parser.add_argument("--device", default="cuda:0", type=str, help="运算设备")
-    parser.add_argument("--output", default="output/eng-zh", type=str, help="训练结果保存路径")
+    parser.add_argument("--output", default="output/eng-fre_bleu", type=str, help="训练结果保存路径")
 
     return parser
 
@@ -118,10 +125,12 @@ class TranslationDataset(Dataset):
     def __init__(
         self,
         file_path: str,
-        src_lang: str = "en",
-        tgt_lang: str = "zh",
+        src_lang: str,
+        tgt_lang: str,
         src_dict: str = None,
         tgt_dict: str = None,
+        max_len: int = 256,
+        min_freq: int = 1,
     ):
         """
 
@@ -147,8 +156,8 @@ class TranslationDataset(Dataset):
         # 迭代原始数据，进行分词处理
         data = texts[[LANGUAGE[src_lang], LANGUAGE[tgt_lang]]].values
         for src, tgt in tqdm(data, total=self.length, desc="Loading Data"):
-            self.src_sentences.append(self.src_tokenizer(src))
-            self.tgt_sentences.append(self.tgt_tokenizer(tgt))
+            self.src_sentences.append(self.src_tokenizer(src)[:max_len])
+            self.tgt_sentences.append(self.tgt_tokenizer(tgt)[:max_len])
 
         # 构建词汇表对象
         if src_dict is not None:
@@ -156,13 +165,13 @@ class TranslationDataset(Dataset):
                 src_words = list(map(lambda i: i.strip(), f.readlines()))
             self.src_vocab = vocab(OrderedDict(zip(src_words, [10] * len(src_words))))
         else:
-            self.src_vocab = build_vocab_from_iterator(self.src_sentences, 1, specials=SPECIALS)
+            self.src_vocab = build_vocab_from_iterator(self.src_sentences, min_freq, specials=SPECIALS)
         if tgt_dict is not None:
             with open(tgt_dict, encoding="utf-8") as f:
                 tgt_words = list(map(lambda i: i.strip(), f.readlines()))
             self.tgt_vocab = vocab(OrderedDict(zip(tgt_words, [10] * len(tgt_words))))
         else:
-            self.tgt_vocab = build_vocab_from_iterator(self.tgt_sentences, 1, specials=SPECIALS)
+            self.tgt_vocab = build_vocab_from_iterator(self.tgt_sentences, min_freq, specials=SPECIALS)
 
         # 设置默认字符为 <unk> 的索引
         self.src_vocab.set_default_index(UNK_IDX)
@@ -438,10 +447,7 @@ def translate(model: torch.nn.Module, src_sentence: str, tokenizer, vocab, devic
     return " ".join(vocab.lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
 
 
-if __name__ == "__main__":
-    parser = get_args_parser()
-    args = parser.parse_args()
-
+def main(args):
     # ------------------------ #
     # Config
     # ------------------------ #
@@ -465,6 +471,8 @@ if __name__ == "__main__":
     # 获取输出目录
     output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "metrics").mkdir(parents=True, exist_ok=True)
+    (output_dir / "words").mkdir(parents=True, exist_ok=True)
 
     # ------------------------ #
     # Load Data
@@ -479,11 +487,6 @@ if __name__ == "__main__":
         tgt_dict=args.tgt_dict,
     )
     print(dataset)
-    # 保存 vocab
-    with open(output_dir / "src_dict.txt", "w+", encoding="utf-8") as f:
-        f.writelines(map(lambda i: i + "\n", dataset.src_vocab.get_itos()))
-    with open(output_dir / "tgt_dict.txt", "w+", encoding="utf-8") as f:
-        f.writelines(map(lambda i: i + "\n", dataset.tgt_vocab.get_itos()))
 
     # 划分训练、验证、测试集，分批
     indices = np.arange(len(dataset))
@@ -544,164 +547,204 @@ if __name__ == "__main__":
     # Training and Evaluate Model
     # ---------------------------- #
 
-    print("Start training...")
-    BEST_BLEU = 0.0  # 记录最优准确率的 epoch
-    # 记录每个 step 的损失喝准确率
-    LOSS = {
-        "train": [[] for _ in range(args.epochs)],
-        "val": [[] for _ in range(args.epochs)],
-    }
-    BLEU = {
-        "train": [[] for _ in range(args.epochs)],
-        "val": [[] for _ in range(args.epochs)],
-    }
+    if args.mode == "train":
+        print("Start training...")
+        # 保存 vocab
+        with open(output_dir / "words/src_dict.txt", "w+", encoding="utf-8") as f:
+            f.writelines(map(lambda i: i + "\n", dataset.src_vocab.get_itos()))
+        with open(output_dir / "words/tgt_dict.txt", "w+", encoding="utf-8") as f:
+            f.writelines(map(lambda i: i + "\n", dataset.tgt_vocab.get_itos()))
+        BEST_BLEU = 0.0  # 记录最优准确率的 epoch
+        # 记录每个 step 的损失和BLEU分数
+        train_history = {
+            "loss": {
+                "train": [[] for _ in range(args.epochs)],
+                "val": [[] for _ in range(args.epochs)],
+            },
+            "bleu": {
+                "train": [[] for _ in range(args.epochs)],
+                "val": [[] for _ in range(args.epochs)],
+            },
+            "acc": {
+                "train": [[] for _ in range(args.epochs)],
+                "val": [[] for _ in range(args.epochs)],
+            },
+            "best_bleu": 0.0,
+        }
 
-    st = time.time()
-    for epoch in range(start_epoch + 1, args.epochs):
-        with tqdm(total=len(train_db), desc=f"Epoch: {epoch + 1}/{args.epochs}") as pbar:  # 训练进度条
-            model.train()
-            for step, (src, tgt) in enumerate(train_db):
-                # 转移张量至指定运算硬件上
-                src, tgt = src.to(args.device), tgt.to(args.device)
-                tgt_input = tgt[:-1, :]  # 前移一位，不需要终止符
+        st = time.time()
+        for epoch in range(start_epoch + 1, args.epochs):
+            with tqdm(total=len(train_db), desc=f"Epoch: {epoch + 1}/{args.epochs}") as pbar:  # 训练进度条
+                # 初始化准确率计算变量
+                correct, total = {"train": 0, "val": 0}, {"train": 0, "val": 0}
 
-                # 生成 mask
-                src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
+                model.train()
+                for step, (src, tgt) in enumerate(train_db):
+                    # 转移张量至指定运算硬件上
+                    src, tgt = src.to(args.device), tgt.to(args.device)
+                    tgt_input = tgt[:-1, :]  # 前移一位，不需要终止符
 
-                # 计算每个词的概率
-                logits = model(
-                    src,
-                    tgt_input,
-                    src_mask,
-                    tgt_mask,
-                    src_padding_mask,
-                    tgt_padding_mask,
-                    src_padding_mask,
-                )
+                    # 生成 mask
+                    src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
 
-                optimizer.zero_grad()  # 初始化优化器梯度
+                    # 计算每个词的概率
+                    logits = model(
+                        src,
+                        tgt_input,
+                        src_mask,
+                        tgt_mask,
+                        src_padding_mask,
+                        tgt_padding_mask,
+                        src_padding_mask,
+                    )
 
-                # 计算损失
-                tgt_out = tgt[1:, :]  # 前移一位，不需要起始符
-                loss = criterion(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
-                loss.backward()  # 反向传播
+                    optimizer.zero_grad()  # 初始化优化器梯度
 
-                optimizer.step()  # 更新模型参数
+                    # 计算损失
+                    tgt_out = tgt[1:, :]  # 前移一位，不需要起始符
+                    loss = criterion(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+                    loss.backward()  # 反向传播
 
-                # 计算 BLEU
-                pred = torch.argmax(F.log_softmax(logits, -1), -1)
-                bleu = get_bleu_score(tgt_out, pred, dataset.tgt_vocab)
+                    optimizer.step()  # 更新模型参数
 
-                # 记录损失、准确率
-                LOSS["train"][epoch].append(loss.item())
-                BLEU["train"][epoch].append(bleu)
-                # 更新进度条
-                pbar.update(1)
-                pbar.set_postfix(
-                    {
-                        "loss": f"{np.mean(LOSS['train'][epoch]).item():.4f}",
-                        "bleu_score": f"{np.mean(BLEU['train'][epoch]).item() * 100:.2f}%",
-                    }
-                )
+                    # 计算 BLEU
+                    pred = torch.argmax(F.log_softmax(logits, -1), -1)
+                    bleu = get_bleu_score(tgt_out, pred, dataset.tgt_vocab)
 
-            # 训练完一个 epoch 后进行验证
-            model.eval()
-            for step, (src, tgt) in enumerate(val_db):
-                src, tgt = src.to(args.device), tgt.to(args.device)
-                tgt_input = tgt[:-1, :]
+                    # 计算准确率
+                    L = (tgt_out != PAD_IDX).sum(0)
+                    total["train"] += L.sum().item()
+                    correct["train"] += sum(
+                        map(
+                            lambda i: (pred[: L[i], i] == tgt_out[: L[i], i]).sum().item(),
+                            range(pred.shape[1]),
+                        )
+                    )
 
-                src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
+                    # 记录损失、准确率
+                    train_history["loss"]["train"][epoch].append(loss.item())
+                    train_history["bleu"]["train"][epoch].append(bleu)
+                    train_history["acc"]["train"][epoch].append(correct["train"] / total["train"])
+                    # 更新进度条
+                    pbar.update(1)
+                    pbar.set_postfix(
+                        {
+                            "loss": f"{np.mean(train_history['loss']['train'][epoch]).item():.4f}",
+                            "bleu": f"{np.mean(train_history['bleu']['train'][epoch]).item() * 100:.2f}%",
+                            "acc": f"{np.mean(train_history['acc']['train'][epoch]).item() * 100:.2f}%",
+                        }
+                    )
 
-                logits = model(
-                    src,
-                    tgt_input,
-                    src_mask,
-                    tgt_mask,
-                    src_padding_mask,
-                    tgt_padding_mask,
-                    src_padding_mask,
-                )
+                # 训练完一个 epoch 后进行验证
+                model.eval()
+                for step, (src, tgt) in enumerate(val_db):
+                    src, tgt = src.to(args.device), tgt.to(args.device)
+                    tgt_input = tgt[:-1, :]
 
-                tgt_out = tgt[1:, :]
-                loss = criterion(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
+                    src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
 
-                # 计算 BLEU
-                pred = torch.argmax(F.log_softmax(logits, -1), -1)
-                bleu = get_bleu_score(tgt_out, pred, dataset.tgt_vocab)
+                    logits = model(
+                        src,
+                        tgt_input,
+                        src_mask,
+                        tgt_mask,
+                        src_padding_mask,
+                        tgt_padding_mask,
+                        src_padding_mask,
+                    )
 
-                # 记录验证损失、准确率
-                LOSS["val"][epoch].append(loss.item())
-                BLEU["val"][epoch].append(bleu)
-                # 更新进度条
-                pbar.set_postfix(
-                    {
-                        "loss": f"{np.mean(LOSS['train'][epoch]).item():.4f}",
-                        "bleu_score": f"{np.mean(BLEU['train'][epoch]).item() * 100:.2f}%",
-                        "loss_val": f"{np.mean(LOSS['val'][epoch]).item():.4f}",
-                        "bleu_score_val": f"{np.mean(BLEU['val'][epoch]).item() * 100:.2f}%",
-                    }
-                )
+                    tgt_out = tgt[1:, :]
+                    loss = criterion(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
 
-            # 判断验证数据平均准确率是否大于最优准确率，若更高则保存 best_model.pth
-            if np.mean(BLEU["val"][epoch]).item() > BEST_BLEU:
-                BEST_BLEU = np.mean(BLEU["val"][epoch]).item()
-                torch.save(
-                    {
-                        "model": model.state_dict(),
-                        "optimizer": optimizer.state_dict(),
-                        "epoch": epoch,
-                    },
-                    output_dir / "best_model.pth",
-                )
+                    # 计算 BLEU
+                    pred = torch.argmax(F.log_softmax(logits, -1), -1)
+                    bleu = get_bleu_score(tgt_out, pred, dataset.tgt_vocab)
 
-    et = time.time()
-    print("Time taken: %ds" % (et - st))
+                    # 计算准确率
+                    L = (tgt_out != PAD_IDX).sum(0)
+                    total["val"] += L.sum().item()
+                    correct["val"] += sum(
+                        map(
+                            lambda i: (pred[: L[i], i] == tgt_out[: L[i], i]).sum().item(),
+                            range(pred.shape[1]),
+                        )
+                    )
 
-    # 保存最终的模型权重
-    torch.save(
-        {
-            "model": model.state_dict(),
-            "optimizer": optimizer.state_dict(),
-            "epoch": args.epochs,
-        },
-        output_dir / "final_model.pth",
-    )
-    print("模型权重保存到：%s" % output_dir)
-    # 保存损失、准确率
-    print("训练、验证损失和准确率保存到：%s" % (output_dir / "metrics.json"))
-    with open(output_dir / "metrics.json", "w", encoding="utf-8") as f:
-        json.dump({"loss": LOSS, "bleu": BLEU}, f)
+                    # 记录验证损失、准确率
+                    train_history["loss"]["val"][epoch].append(loss.item())
+                    train_history["bleu"]["val"][epoch].append(bleu)
+                    train_history["acc"]["val"][epoch].append(correct["val"] / total["val"])
+                    # 更新进度条
+                    pbar.set_postfix(
+                        {
+                            "loss": f"{np.mean(train_history['loss']['train'][epoch]).item():.4f}",
+                            "bleu_score": f"{np.mean(train_history['bleu']['train'][epoch]).item() * 100:.2f}%",
+                            "acc": f"{np.mean(train_history['acc']['train'][epoch]).item() * 100:.2f}%",
+                            "loss_val": f"{np.mean(train_history['loss']['val'][epoch]).item():.4f}",
+                            "bleu_val": f"{np.mean(train_history['bleu']['val'][epoch]).item() * 100:.2f}%",
+                            "acc_val": f"{np.mean(train_history['acc']['val'][epoch]).item() * 100:.2f}%",
+                        }
+                    )
 
-    # ------------------------ #
-    # Visualization
-    # ------------------------ #
+                # 判断验证数据平均准确率是否大于最优准确率，若更高则保存 best_model.pth
+                if np.mean(train_history["bleu"]["val"][epoch]).item() > BEST_BLEU:
+                    train_history["best_bleu"] = np.mean(train_history["bleu"]["val"][epoch]).item()
+                    torch.save(
+                        {
+                            "model": model.state_dict(),
+                            "optimizer": optimizer.state_dict(),
+                            "epoch": epoch,
+                        },
+                        output_dir / "best_model.pth",
+                    )
 
-    # 绘制损失图
-    plt.figure()
-    plt.plot(np.mean(LOSS["train"], 1), label="Train")
-    plt.plot(np.mean(LOSS["val"], 1), label="Val")
-    plt.legend(loc="best")
-    plt.xlabel("Epoch")
-    plt.ylabel("Loss")
-    plt.tight_layout()
-    plt.savefig(output_dir / "loss.png")
-    # 绘制精准率图
-    plt.figure()
-    plt.plot(np.mean(BLEU["train"], 1), label="Train")
-    plt.plot(np.mean(BLEU["val"], 1), label="Val")
-    plt.legend(loc="best")
-    plt.xlabel("Epoch")
-    plt.ylabel("Bleu")
-    plt.tight_layout()
-    plt.savefig(output_dir / "bleu.png")
+        et = time.time()
+        print("Time taken: %ds" % (et - st))
+
+        # 保存最终的模型权重
+        torch.save(
+            {
+                "model": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "epoch": args.epochs,
+            },
+            output_dir / "final_model.pth",
+        )
+        print("模型权重保存到：%s" % output_dir)
+        # 保存损失、准确率
+        print("训练、验证损失和准确率保存到：%s" % (output_dir / "metrics/train_history.json"))
+        with open(output_dir / "metrics/train_history.json", "w", encoding="utf-8") as f:
+            json.dump(train_history, f)
+
+        # ------------------------ #
+        # Visualization
+        # ------------------------ #
+
+        # 绘制损失图
+        plt.figure()
+        plt.plot(np.mean(train_history["loss"]["train"], 1), label="Train")
+        plt.plot(np.mean(train_history["loss"]["val"], 1), label="Val")
+        plt.legend(loc="best")
+        plt.xlabel("Epoch")
+        plt.ylabel("Loss")
+        plt.tight_layout()
+        plt.savefig(output_dir / "metrics/loss.png")
+        # 绘制精准率图
+        plt.figure()
+        plt.plot(np.mean(train_history["bleu"]["train"], 1), label="Train")
+        plt.plot(np.mean(train_history["bleu"]["val"], 1), label="Val")
+        plt.legend(loc="best")
+        plt.xlabel("Epoch")
+        plt.ylabel("Bleu")
+        plt.tight_layout()
+        plt.savefig(output_dir / "metrics/bleu.png")
 
     # ------------------------ #
     # Evaluating Model
     # ------------------------ #
 
-    # 读取模型权重
-    # model.load_state_dict(torch.load(output_dir / "model.pth"))
     print("Start Evaluate...")
+    correct, total = 0, 0
     model.eval()
     with tqdm(total=len(val_db), desc="Evaluating") as pbar:
         for step, (src, tgt) in enumerate(val_db):
@@ -710,15 +753,7 @@ if __name__ == "__main__":
 
             src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
 
-            logits = model(
-                src,
-                tgt_input,
-                src_mask,
-                tgt_mask,
-                src_padding_mask,
-                tgt_padding_mask,
-                src_padding_mask,
-            )
+            logits = model(src, tgt_input, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask, src_padding_mask)
 
             tgt_out = tgt[1:, :]
             loss = criterion(logits.reshape(-1, logits.shape[-1]), tgt_out.reshape(-1))
@@ -727,23 +762,49 @@ if __name__ == "__main__":
             pred = torch.argmax(F.log_softmax(logits, -1), -1)
             bleu = get_bleu_score(tgt_out, pred, dataset.tgt_vocab)
 
+            # 计算准确率
+            L = (tgt_out != PAD_IDX).sum(0)
+            total += L.sum().item()
+            correct += sum(
+                map(
+                    lambda i: (pred[: L[i], i] == tgt_out[: L[i], i]).sum().item(),
+                    range(pred.shape[1]),
+                )
+            )
+
             pbar.update(1)
-            pbar.set_postfix({"loss_val": f"{loss.item():.4f}", "bleu_val": f"{bleu * 100:.2f}%"})
+            pbar.set_postfix(
+                {
+                    "loss_val": f"{loss.item():.4f}",
+                    "bleu_val": f"{bleu * 100:.2f}%",
+                    "acc_val": f"{correct / total * 100:.2f}%",
+                }
+            )
 
     # ------------------------ #
     # Prediction
     # ------------------------ #
 
     print("Start Testing...")
-    for src, tgt in test_db:
-        src = src.to(args.device)
-        num_tokens = src.shape[0]
-        src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool).to(args.device)
-        tgt_tokens = greedy_decode(model, src, src_mask, num_tokens + 5, BOS_IDX)
+    with open(output_dir / "test.txt", "a", encoding="utf-8") as f:
+        for src, tgt in test_db:
+            src = src.to(args.device)
+            num_tokens = src.shape[0]
+            src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool).to(args.device)
+            tgt_tokens = greedy_decode(model, src, src_mask, num_tokens + 5, BOS_IDX)
 
-        print("原始翻译：", " ".join(dataset.tgt_vocab.lookup_tokens(tgt.flatten().tolist())))
-        print(
-            "模型翻译：",
-            " ".join(dataset.tgt_vocab.lookup_tokens(tgt_tokens.flatten().tolist())),
-        )
-        print()
+            tgt_sentences = " ".join(dataset.tgt_vocab.lookup_tokens(tgt.flatten().tolist()))
+            pred_sentence = " ".join(dataset.tgt_vocab.lookup_tokens(tgt_tokens.flatten().tolist()))
+
+            f.write(f"{tgt_sentences}\t{pred_sentence}\n")
+
+            print(f"原始翻译：{tgt_sentences}")
+            print(f"模型翻译：{pred_sentence}")
+            print()
+
+
+if __name__ == "__main__":
+    parser = get_args_parser()
+    args = parser.parse_args()
+
+    main(args)
