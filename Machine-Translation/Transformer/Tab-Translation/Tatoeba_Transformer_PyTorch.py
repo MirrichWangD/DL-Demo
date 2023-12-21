@@ -592,12 +592,7 @@ def main(args):
                     tgt_input = tgt[:-1, :]  # 删除最后一位，为了匹配最后预测的形状
 
                     # 生成 mask
-                    (
-                        src_mask,
-                        tgt_mask,
-                        src_padding_mask,
-                        tgt_padding_mask,
-                    ) = create_mask(src, tgt_input)
+                    src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
 
                     # 计算每个词的概率
                     logits = model(
@@ -723,7 +718,7 @@ def main(args):
             json.dump(train_history, f)
 
         # 可视化训练过程（损失、准确率）
-        ## 绘制损失图
+        # 绘制损失图
         fig, ax = plt.subplots(1, 1, dpi=200)
         ax.plot(np.mean(train_history["loss"]["train"], 1), label="Train")
         ax.plot(np.mean(train_history["loss"]["val"], 1), label="Val")
@@ -732,7 +727,7 @@ def main(args):
         ax.set_ylabel("Loss")
         fig.tight_layout()
         fig.savefig(output_dir / "metrics" / "loss.png")
-        ## 绘制精准率图
+        # 绘制精准率图
         fig, ax = plt.subplots(1, 1, dpi=200)
         ax.plot(np.mean(train_history["acc"]["train"], 1), label="Train")
         ax.plot(np.mean(train_history["acc"]["val"], 1), label="Val")
@@ -804,9 +799,7 @@ def main(args):
 
             f.write(f"{tgt_sentence}\t{pred_sentence}\n")
 
-            print(
-                f"原始翻译：{tgt_sentence}",
-            )
+            print(f"原始翻译：{tgt_sentence}")
             print(f"模型翻译：{pred_sentence}")
             print()
 
