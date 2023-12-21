@@ -58,7 +58,7 @@ warnings.filterwarnings("ignore")
 ++++++++++++++++++++++++"""
 
 LANGUAGE = {}
-# 定义特殊TOKEN
+# 定义特殊TOKENdd
 PAD_IDX, UNK_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
 SPECIALS = ["<pad>", "<unk>", "<bos>", "<eos>"]
 # 定义 spacy 语言模型库，用于分词，该部分可以自行增加
@@ -100,16 +100,16 @@ def get_args_parser():
     parser.add_argument("--d_model", default=512, type=int, help="Embedding嵌入层维数")
     parser.add_argument("--d_ff", default=2048, type=int, help="FFN维数")
     parser.add_argument("--dropout", default=0.1, type=float, help="LN层Dropout比例")
-    parser.add_argument("--resume", default="./output/eng-zh_bleu/final_model.pth", type=str, help="导入模型权重路径")
+    parser.add_argument("--resume", default=None, type=str, help="导入模型权重路径")
 
     # 训练参数
-    parser.add_argument("--mode", default="eval", choices=["train", "eval"], help="脚本模式，train：训练；eval：验证")
-    parser.add_argument("--epochs", default=0, type=int, help="训练轮数")
+    parser.add_argument("--mode", default="train", choices=["train", "eval"], help="脚本模式，train：训练；eval：验证")
+    parser.add_argument("--epochs", default=100, type=int, help="训练轮数")
     parser.add_argument("--lr", default=0.0001, type=float, help="学习率")
     parser.add_argument("--batch_size", default=64, type=int, help="批数量")
     parser.add_argument("--n_workers", default=0, type=int, help="读取数据进程数，使用交互式窗口运行时请设置为0")
     parser.add_argument("--device", default="cuda:0", type=str, help="运算设备")
-    parser.add_argument("--output", default="output/eng-fre_bleu", type=str, help="训练结果保存路径")
+    parser.add_argument("--output", default=None, type=str, help="训练结果保存路径")
 
     return parser
 
@@ -373,14 +373,16 @@ class Transformer(nn.Module):
 
 
 def get_bleu_score(tgt, pred, vocab):
+    bleu = []
     candidate_corpus = []
     references_corpus = []
     for i in range(tgt.shape[1]):
         L = (tgt[:, i] != PAD_IDX).sum()
-        candidate_corpus.append(vocab.lookup_tokens(pred[:, :L].flatten().tolist()))
-        references_corpus.append([vocab.lookup_tokens(tgt[:, :L].flatten().tolist())])
+        candidate = vocab.lookup_tokens(pred[:, :L].flatten().tolist())
+        reference = vocab.lookup_tokens(tgt[:, :L].flatten().tolist())
+        bleu.append(bleu_score([candidate], [[reference]]))
 
-    return bleu_score(candidate_corpus, references_corpus)
+    return np.mean(bleu)
 
 
 """++++++++++++++++++++++
@@ -465,11 +467,14 @@ def main(args):
     if args.src_lang not in SPACY.keys() or args.tgt_lang not in SPACY.keys():
         raise "请确保 spacy 模块中是否包含设置的输入、输出语言！"
     # 设置开始轮数
-    start_epoch = -1
+    start_epoch = 0
     # 设置训练硬件
     args.device = torch.device(args.device) if torch.cuda.is_available() else torch.device("cpu")
     # 获取输出目录
-    output_dir = Path(args.output)
+    if args.output is None:
+        output_dir = Path(f"output/{args.src_lang}-{args.tgt_lang}_BLEU")
+    else:
+        output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
     (output_dir / "metrics").mkdir(parents=True, exist_ok=True)
     (output_dir / "words").mkdir(parents=True, exist_ok=True)
@@ -539,7 +544,7 @@ def main(args):
     # 设置断点训练
     if args.resume:
         resume = torch.load(args.resume)
-        start_epoch = resume["epoch"]
+        start_epoch = resume["epoch"] - 1
         model.load_state_dict(resume["model"])
         optimizer.load_state_dict(resume["optimizer"])
 
@@ -573,7 +578,7 @@ def main(args):
         }
 
         st = time.time()
-        for epoch in range(start_epoch + 1, args.epochs):
+        for epoch in range(start_epoch, args.epochs - 1):
             with tqdm(total=len(train_db), desc=f"Epoch: {epoch + 1}/{args.epochs}") as pbar:  # 训练进度条
                 # 初始化准确率计算变量
                 correct, total = {"train": 0, "val": 0}, {"train": 0, "val": 0}
@@ -678,7 +683,7 @@ def main(args):
                     pbar.set_postfix(
                         {
                             "loss": f"{np.mean(train_history['loss']['train'][epoch]).item():.4f}",
-                            "bleu_score": f"{np.mean(train_history['bleu']['train'][epoch]).item() * 100:.2f}%",
+                            "bleu": f"{np.mean(train_history['bleu']['train'][epoch]).item() * 100:.2f}%",
                             "acc": f"{np.mean(train_history['acc']['train'][epoch]).item() * 100:.2f}%",
                             "loss_val": f"{np.mean(train_history['loss']['val'][epoch]).item():.4f}",
                             "bleu_val": f"{np.mean(train_history['bleu']['val'][epoch]).item() * 100:.2f}%",
@@ -722,8 +727,8 @@ def main(args):
 
         # 绘制损失图
         plt.figure()
-        plt.plot(np.mean(train_history["loss"]["train"], 1), label="Train")
-        plt.plot(np.mean(train_history["loss"]["val"], 1), label="Val")
+        plt.plot(np.mean(train_history["loss"]["train"][start_epoch : args.epochs + 1], 1), label="Train")
+        plt.plot(np.mean(train_history["loss"]["val"][start_epoch : args.epochs + 1], 1), label="Val")
         plt.legend(loc="best")
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
@@ -731,8 +736,8 @@ def main(args):
         plt.savefig(output_dir / "metrics/loss.png")
         # 绘制精准率图
         plt.figure()
-        plt.plot(np.mean(train_history["bleu"]["train"], 1), label="Train")
-        plt.plot(np.mean(train_history["bleu"]["val"], 1), label="Val")
+        plt.plot(np.mean(train_history["bleu"]["train"][start_epoch : args.epochs + 1], 1), label="Train")
+        plt.plot(np.mean(train_history["bleu"]["val"][start_epoch : args.epochs + 1], 1), label="Val")
         plt.legend(loc="best")
         plt.xlabel("Epoch")
         plt.ylabel("Bleu")
@@ -744,6 +749,7 @@ def main(args):
     # ------------------------ #
 
     print("Start Evaluate...")
+    bleu = []
     correct, total = 0, 0
     model.eval()
     with tqdm(total=len(val_db), desc="Evaluating") as pbar:
@@ -760,7 +766,7 @@ def main(args):
 
             # 计算 BLEU
             pred = torch.argmax(F.log_softmax(logits, -1), -1)
-            bleu = get_bleu_score(tgt_out, pred, dataset.tgt_vocab)
+            bleu.append(get_bleu_score(tgt_out, pred, dataset.tgt_vocab))
 
             # 计算准确率
             L = (tgt_out != PAD_IDX).sum(0)
@@ -776,7 +782,7 @@ def main(args):
             pbar.set_postfix(
                 {
                     "loss_val": f"{loss.item():.4f}",
-                    "bleu_val": f"{bleu * 100:.2f}%",
+                    "bleu_val": f"{np.mean(bleu) * 100:.2f}%",
                     "acc_val": f"{correct / total * 100:.2f}%",
                 }
             )
