@@ -578,7 +578,7 @@ def main(args):
         }
 
         st = time.time()
-        for epoch in range(start_epoch, args.epochs - 1):
+        for epoch in range(start_epoch, args.epochs):
             with tqdm(total=len(train_db), desc=f"Epoch: {epoch + 1}/{args.epochs}") as pbar:  # 训练进度条
                 # 初始化准确率计算变量
                 correct, total = {"train": 0, "val": 0}, {"train": 0, "val": 0}
