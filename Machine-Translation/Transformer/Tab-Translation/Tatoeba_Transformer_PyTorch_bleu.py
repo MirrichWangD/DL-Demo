@@ -374,8 +374,6 @@ class Transformer(nn.Module):
 
 def get_bleu_score(tgt, pred, vocab):
     bleu = []
-    candidate_corpus = []
-    references_corpus = []
     for i in range(tgt.shape[1]):
         L = (tgt[:, i] != PAD_IDX).sum()
         candidate = vocab.lookup_tokens(pred[:, :L].flatten().tolist())
@@ -559,7 +557,6 @@ def main(args):
             f.writelines(map(lambda i: i + "\n", dataset.src_vocab.get_itos()))
         with open(output_dir / "words/tgt_dict.txt", "w+", encoding="utf-8") as f:
             f.writelines(map(lambda i: i + "\n", dataset.tgt_vocab.get_itos()))
-        BEST_BLEU = 0.0  # 记录最优准确率的 epoch
         # 记录每个 step 的损失和BLEU分数
         train_history = {
             "loss": {
@@ -692,7 +689,7 @@ def main(args):
                     )
 
                 # 判断验证数据平均准确率是否大于最优准确率，若更高则保存 best_model.pth
-                if np.mean(train_history["bleu"]["val"][epoch]).item() > BEST_BLEU:
+                if np.mean(train_history["bleu"]["val"][epoch]).item() > train_history["best_bleu"]:
                     train_history["best_bleu"] = np.mean(train_history["bleu"]["val"][epoch]).item()
                     torch.save(
                         {
