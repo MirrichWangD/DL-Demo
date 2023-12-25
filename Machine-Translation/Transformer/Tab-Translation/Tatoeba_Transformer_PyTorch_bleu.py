@@ -376,8 +376,8 @@ def get_bleu_score(tgt, pred, vocab):
     bleu = []
     for i in range(tgt.shape[1]):
         L = (tgt[:, i] != PAD_IDX).sum()
-        candidate = vocab.lookup_tokens(pred[:, :L].flatten().tolist())
-        reference = vocab.lookup_tokens(tgt[:, :L].flatten().tolist())
+        candidate = vocab.lookup_tokens(pred[:L, i].flatten().tolist())
+        reference = vocab.lookup_tokens(tgt[:L, i].flatten().tolist())
         bleu.append(bleu_score([candidate], [[reference]]))
 
     return np.mean(bleu)
