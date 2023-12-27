@@ -419,34 +419,6 @@ def greedy_decode(model: nn.Module, src: Tensor, src_mask: Tensor, max_len: int,
     return ys
 
 
-def translate(model: torch.nn.Module, src_sentence: str, tokenizer, vocab, device) -> str:
-    """
-
-    Args:
-        model: torch.nn.Module 模型对象
-        src_sentence: str 待翻译句子
-        tokenizer: functools.partial 分词器
-        vocab: torchtext.vocab.vocab.Vocab torchtext生成的词汇对象
-        device: torch.device 运算设备
-
-    Returns:
-        str
-    """
-    model.eval()
-    src = tokenizer(src_sentence).view(-1, 1)
-    num_tokens = src.shape[0]
-    src_mask = (torch.zeros(num_tokens, num_tokens)).type(torch.bool)
-    tgt_tokens = greedy_decode(
-        model,
-        src,
-        src_mask,
-        max_len=num_tokens + 5,
-        start_symbol=BOS_IDX,
-        device=device,
-    ).flatten()
-    return " ".join(vocab.lookup_tokens(list(tgt_tokens.cpu().numpy()))).replace("<bos>", "").replace("<eos>", "")
-
-
 def main(args):
     # ------------------------ #
     # Config
@@ -789,7 +761,7 @@ def main(args):
     # ------------------------ #
 
     print("Start Testing...")
-    with open(output_dir / "test.txt", "a", encoding="utf-8") as f:
+    with open(output_dir / "test.txt", "a", encoding="utf-8") as fp:
         for src, tgt in test_db:
             src = src.to(args.device)
             num_tokens = src.shape[0]
@@ -799,7 +771,7 @@ def main(args):
             tgt_sentences = " ".join(dataset.tgt_vocab.lookup_tokens(tgt.flatten().tolist()))
             pred_sentence = " ".join(dataset.tgt_vocab.lookup_tokens(tgt_tokens.flatten().tolist()))
 
-            f.write(f"{tgt_sentences}\t{pred_sentence}\n")
+            fp.write(f"{tgt_sentences}\t{pred_sentence}\n")
 
             print(f"原始翻译：{tgt_sentences}")
             print(f"模型翻译：{pred_sentence}")
