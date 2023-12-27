@@ -33,6 +33,7 @@ import argparse
 import math
 import time
 import json
+import re
 
 # 导入依赖模块
 from tqdm import tqdm
@@ -146,7 +147,7 @@ class TranslationDataset(Dataset):
         self.tgt_sentences = []
 
         # 读取原始数据，获取长度
-        texts = pd.read_table(file_path, header=None)
+        texts = pd.read_table(file_path, header=None, encoding="utf-8")
         self.length = texts.shape[0]
 
         # 通过 spacy 获取语言模型
@@ -156,6 +157,8 @@ class TranslationDataset(Dataset):
         # 迭代原始数据，进行分词处理
         data = texts[[LANGUAGE[src_lang], LANGUAGE[tgt_lang]]].values
         for src, tgt in tqdm(data, total=self.length, desc="Loading Data"):
+            src = re.sub("\s+", " ", src)
+            tgt = re.sub("\s+", " ", tgt)
             self.src_sentences.append(self.src_tokenizer(src)[:max_len])
             self.tgt_sentences.append(self.tgt_tokenizer(tgt)[:max_len])
 
