@@ -36,7 +36,6 @@ import torchsummary
 N_WORKERS = 0
 BATCH_SIZE = 128
 EPOCHS = 100
-VAL_SIZE = 5000
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
 plt.rcParams["font.family"] = ["Times New Roman"]
@@ -87,16 +86,11 @@ class CIFAR10(Dataset):
         self.data = []
         self.labels = []
 
-        if train:
-            file_list = self.train_list
-            shape = [-1, self.n_channels] + self.img_size
-        else:
-            file_list = self.test_list
-            shape = [-1, self.n_channels] + self.img_size
+        file_list = self.train_list if train else self.test_list
 
         for file in file_list:
             meta = load_meta(os.path.join(root, self.base_folder, file))
-            self.data.extend(meta["data"].reshape(shape))
+            self.data.extend(meta["data"].reshape([-1, self.n_channels] + self.img_size))
             self.labels.extend(meta["labels"])
 
     def __len__(self):
@@ -258,38 +252,37 @@ def main():
     # 构造训练、测试数据
     train_data = CIFAR10(root="./data", train=True)
     test_data = CIFAR10(root="./data", train=False)
-    # 生成训练、评估、测试数据迭代器
-    indices = torch.randperm(len(train_data))
-    train_db = DataLoader(train_data, batch_size=BATCH_SIZE, num_workers=N_WORKERS, sampler=indices[:-VAL_SIZE])
-    valid_db = DataLoader(train_data, batch_size=BATCH_SIZE, num_workers=N_WORKERS, sampler=indices[-VAL_SIZE:])
-    test_db = DataLoader(test_data, batch_size=1, num_workers=N_WORKERS)
+
+    # 生成训练、测试数据迭代器
+    train_db = DataLoader(train_data, batch_size=BATCH_SIZE, num_workers=N_WORKERS)
+    test_db = DataLoader(test_data, batch_size=BATCH_SIZE, num_workers=N_WORKERS)
 
     # 按照原文设置优化器和损失函数
     optimizer = torch.optim.SGD(model.parameters(), lr=0.3, momentum=0.9, weight_decay=1e-4)
     criterion = torch.nn.CrossEntropyLoss()
 
     best_valid_loss = float("inf")
-    train_history = {"loss": [], "acc": [], "loss_val": [], "acc_val": []}
+    train_history = {"loss": [], "acc": [], "loss_test": [], "acc_test": []}
     # 开始训练和评估
     st = time.time()
     for epoch in range(EPOCHS):
         with tqdm(total=len(train_db), desc=f"Epoch {epoch+1}/{EPOCHS}") as pbar:
             train_loss, train_acc = process(model, train_db, criterion, optimizer, pbar=pbar)
-            valid_loss, valid_acc = process(model, valid_db, criterion, pbar=pbar)
+            test_loss, test_acc = process(model, test_db, criterion, pbar=pbar)
 
             train_history["loss"].append(train_loss)
             train_history["acc"].append(train_acc)
-            train_history["loss_val"].append(valid_loss)
-            train_history["acc_val"].append(valid_acc)
-            if np.mean(valid_loss) < best_valid_loss:
-                best_valid_loss = np.mean(valid_loss)
+            train_history["loss_test"].append(test_loss)
+            train_history["acc_test"].append(test_acc)
+            if np.mean(test_loss) < best_valid_loss:
+                best_valid_loss = np.mean(test_loss)
                 torch.save(model.state_dict(), "./ckpt/best_model.pt")
             pbar.set_postfix(
                 {
                     "loss": f"{np.mean(train_loss):.4f}",
                     "acc": f"{np.mean(train_acc) * 100:.2f}%",
-                    "loss_val": f"{np.mean(valid_loss):.4f}",
-                    "acc_val": f"{np.mean(valid_acc) * 100:.2f}%",
+                    "loss_test": f"{np.mean(test_loss):.4f}",
+                    "acc_test": f"{np.mean(test_acc) * 100:.2f}%",
                 }
             )
     et = time.time()
@@ -303,13 +296,13 @@ def main():
     plt.figure(figsize=(6, 4))
     plt.title("Train Loss")
     plt.plot(list(map(lambda i: np.mean(i), train_history["loss"])), "b-", label="Train")
-    plt.plot(list(map(lambda i: np.mean(i), train_history["loss_val"])), "r-", label="Valid")
+    plt.plot(list(map(lambda i: np.mean(i), train_history["loss_test"])), "r-", label="Test")
     plt.savefig("./ckpt/train_loss.png")
 
     plt.figure(figsize=(6, 4))
     plt.title("Train Acc")
     plt.plot(list(map(lambda i: np.mean(i), train_history["acc"])), "b-", label="Train")
-    plt.plot(list(map(lambda i: np.mean(i), train_history["acc_val"])), "r-", label="Valid")
+    plt.plot(list(map(lambda i: np.mean(i), train_history["acc_test"])), "r-", label="Test")
     plt.savefig("./ckpt/train_acc.png")
 
 
