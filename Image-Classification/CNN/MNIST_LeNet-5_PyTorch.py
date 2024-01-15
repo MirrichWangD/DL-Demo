@@ -24,8 +24,10 @@ from tqdm import tqdm
 # 导入torch相关模块
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
+
 import torchsummary
-import torch.utils.data as data
+
 from torchvision import transforms
 from torchvision.datasets import MNIST
 
@@ -40,7 +42,7 @@ save_dir = "./output/MNIST_LeNet-5"  # 模型权重保存路径
 num_channels = 1  # 图像通道数
 image_size = 28  # 图像尺寸
 num_workers = 0  # 读取图片进程数
-valid_split = 0.2  # 在训练集上划出验证集的尺寸0
+valid_split = 0.2  # 在训练集上划出验证集的尺寸0.2
 # 训练配置
 epochs = 20  # 周期
 batch_size = 512  # 批次大小
@@ -54,7 +56,7 @@ mpl.rcParams["font.sans-serif"] = ["Times New Roman"]  # 使用新罗马字体
 transform = transforms.Compose(
     [
         transforms.ToTensor(),  # 转换为张量
-        # transforms.Grayscale(num_output_channels=num_channels),  # 转换成灰度单通道图像 （使用ImageFolder请取消注释）
+        # transforms.Grayscale(num_output_channels=num_channels),  # 转换成灰度单通道图像
     ]
 )
 # 读取图片为数据集
@@ -65,9 +67,9 @@ valid_size = int(len(train_data) * valid_split)
 indices = np.arange(len(train_data))
 np.random.shuffle(indices)
 # 构造迭代器
-train_db = data.DataLoader(dataset=train_data, batch_size=batch_size, sampler=indices[:-valid_size])
-val_db = data.DataLoader(dataset=train_data, batch_size=batch_size, sampler=indices[-valid_size:])
-test_db = data.DataLoader(dataset=test_data, batch_size=batch_size)
+train_db = DataLoader(dataset=train_data, batch_size=batch_size, sampler=indices[:-valid_size])
+val_db = DataLoader(dataset=train_data, batch_size=batch_size, sampler=indices[-valid_size:])
+test_db = DataLoader(dataset=test_data, batch_size=batch_size)
 print("Train: (%i, %i, %i, %i)" % (len(indices[:-valid_size]), num_channels, image_size, image_size))
 print("Valid: (%i, %i, %i, %i)" % (len(indices[-valid_size:]), num_channels, image_size, image_size))
 print("Test: (%i, %i, %i, %i)" % (len(test_data), num_channels, image_size, image_size))
@@ -139,6 +141,7 @@ st = time.time()
 for epoch in range(epochs):
     with tqdm(total=len(train_db), desc=f"Epoch {epoch + 1}/{epochs}") as pbar:
         for step, (x, y) in enumerate(train_db):
+            print(y)
             net.train()  # 标记模型开始训练，此时权重可变
             x, y = x.to(device), y.to(device)  # 转移张量至 GPU
             output = net(x)  # 将 x 送进模型进行推导

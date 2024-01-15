@@ -12,9 +12,12 @@ http://www.cs.toronto.edu/~kriz/cifar.html
 
 # 导入需要的模块
 # 导入TensorFlow模块，keras作为tensorflow的子模块：tf.keras
+import os
 import time
 import numpy as np
+import pandas as pd
 import tensorflow as tf
+import matplotlib.pyplot as plt
 
 """--------------------------
 载入CIFAR10图像数据集与数据准备
@@ -41,10 +44,8 @@ label_dict = {
     9: "truck",
 }
 
+
 # 查看前5个images
-import matplotlib.pyplot as plt
-
-
 def plot_images_labels_prediction(images, labels, prediction, idx, num=5):
     fig = plt.gcf()
     fig.set_size_inches(8, 10)
@@ -70,6 +71,7 @@ plot_images_labels_prediction(x_img_train, y_label_train, [], 0)
 """-------------------
 数据标准化（归一化）
 ----------------------"""
+
 x_img_train_normalize = x_img_train.astype("float32") / 255.0
 x_img_test_normalize = x_img_test.astype("float32") / 255.0
 
@@ -83,6 +85,7 @@ y_label_test_OneHot.shape
 """----------------------------
 @@@     建立卷积神经网络模型
 ----------------------------"""
+
 model = tf.keras.Sequential()
 
 """
@@ -124,7 +127,7 @@ model.add(tf.keras.layers.MaxPooling2D(pool_size=(2, 2)))
 """
 model.add(tf.keras.layers.Conv2D(filters=64, kernel_size=(3, 3), activation="relu", padding="same"))
 
-##避免过度拟合
+# 避免过度拟合
 model.add(tf.keras.layers.Dropout(0.25))
 
 """池化层2
@@ -150,7 +153,7 @@ model.add(tf.keras.layers.Dense(10, activation="softmax"))
 print(model.summary())
 
 """------------------------------------------
-  开始训练模型： 训练epochs=10周期 
+  开始训练模型： 训练epochs=10周期
   CPU需要17分钟
   GPU 30秒
 ---------------------------------------------"""
@@ -258,14 +261,11 @@ y_label_test.shape
 y_label_test
 y_label_test.reshape(-1)
 
-import pandas as pd
 
 print(label_dict)
 pd.crosstab(y_label_test.reshape(-1), prediction, rownames=["label"], colnames=["predict"])
 
 print(label_dict)
-
-import os
 
 os.makedirs("./out/Cifar10")
 """ 保存模型的结构和权重"""
@@ -274,7 +274,7 @@ model_json = model.to_json()
 with open("./out/Cifar10/cifarCnnModelnew.json", "w+") as json_file:
     json_file.write(model_json)
 
-## Tensorflow 2.8.0 had removed model.to_yaml()
+# Tensorflow 2.8.0 had removed model.to_yaml()
 # # Save Model to YAML
 # model_yaml = model.to_yaml()
 #
