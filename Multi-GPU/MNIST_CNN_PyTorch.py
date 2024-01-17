@@ -42,22 +42,52 @@ from torchvision import transforms
 from torchvision.datasets import MNIST
 
 
+"""=========================
+@@@ 启动参数初始化
+========================="""
+
+
+def init_parse_args():
+    parser = argparse.ArgumentParser()
+    # 训练参数
+    parser.add_argument("--epochs", type=int, default=30)
+    parser.add_argument("--batch-size", type=int, default=64)
+    parser.add_argument("--lr", type=float, default=0.001)
+    parser.add_argument("--lrf", type=float, default=0.1)
+
+    # 数据集所在根目录
+    parser.add_argument("--data-path", type=str, default="./data")
+
+    # 分布式配置
+    parser.add_argument("--dist-backend", default="nccl", type=str, help="please use 'gloo' on windows platform")
+    parser.add_argument("--dist-url", default="env://", help="url used to set up distributed training")
+    parser.add_argument("--num-workers", default=4, type=int)
+    # 以下参数不需要更改，会根据 nproc_per_node 自动设置
+    parser.add_argument("--device", default="cuda", help="device id (i.e. 0 or 0,1 or cpu)")
+    parser.add_argument("--world-size", default=4, type=int, help="number of distributed processes")
+
+    return parser.parse_args()
+
+
 """========================================
 @@@ 分布式运行环境初始化
 ========================================"""
 
 
 def init_distributed_mode(args):
-    """
-    初始化分布式模式
+    """初始化分布式模式
     注：一个进程对应一块 GPU
+
     - 如果是"多机多卡"的机器：
         - WORLD_SIZE 代表所有机器中使用的进程（GPU）数量
-        - RANK 代表所有进程中的第几个进程
+        - RANK 代表当前机器/进程节点，如 0 为主机
         - LOCAL_RANK 表示当前机器中第几个进程
     - 如果是"单机多卡"的机器：
         - WORLD_SIZE 代表有几块 GPU
         - RANK 和 LOCAL_RANK 代表第几块 GPU
+
+    Args:
+        args (argparse.Namespace): 启动参数解释器对象
     """
     # torch.distributed.launch 会根据 nproc_per_node 自动设置环境参数
     if "RANK" in os.environ and "WORLD_SIZE" in os.environ:
@@ -69,13 +99,9 @@ def init_distributed_mode(args):
         args.gpu = args.rank % torch.cuda.device_count()
     else:
         print("Not using distributed mode")
-        args.distributed = False
         return
 
-    args.distributed = True
-
-    torch.cuda.set_device(args.gpu)  # 对当前进程指定使用的GPU
-    args.dist_backend = "nccl"  # 通信后端，nvidia GPU推荐使用NCCL
+    torch.cuda.set_device(args.gpu)  # 对当前进程指定使用的 GPU
     print("| distributed init (rank {}): {}".format(args.rank, args.dist_url), flush=True)
     dist.init_process_group(
         backend=args.dist_backend, init_method=args.dist_url, world_size=args.world_size, rank=args.rank
@@ -84,8 +110,7 @@ def init_distributed_mode(args):
 
 
 def reduce_value(value, average=True):
-    """
-    根据 world_size 对值进行减少
+    """根据 world_size 对值进行减少
 
     Args:
         value (tensor, int, float): 要平均计算的值
@@ -156,30 +181,38 @@ class CNN(nn.Module):
 ========================="""
 
 
-def train_one_epoch(model, optimizer, data_loader, device, epoch):
+def train_one_epoch(model, optimizer, data_loader, device, rank, epoch_info):
+    """模型训练一个周期函数
+
+    Args:
+        model (nn.module): 模型对象
+        optimizer: 优化器对象
+        data_loader: 数据迭代器
+        device: 运算设备
+        epoch_info (str): 周期字符串信息
+
+    Returns:
+        float: 当前周期下模型训练损失平均值
+    """
     model.train()
-    loss_function = torch.nn.CrossEntropyLoss()
+    criterion = torch.nn.CrossEntropyLoss()
     mean_loss = torch.zeros(1).to(device)
     optimizer.zero_grad()
 
-    # 在进程 0 中打印训练进度
-    if dist.get_rank() == 0:
-        data_loader = tqdm(data_loader, file=sys.stdout)
-
-    for step, data in enumerate(data_loader):
-        images, labels = data
-
+    for step, (images, labels) in enumerate(data_loader):
+        # 模型推理
         pred = model(images.to(device))
-
-        loss = loss_function(pred, labels.to(device))
+        # 计算损失
+        loss = criterion(pred, labels.to(device))
         loss.backward()
         loss = reduce_value(loss, average=True)
         mean_loss = (mean_loss * step + loss.detach()) / (step + 1)  # update mean losses
+        # 计算显存
+        mem = f"{torch.cuda.memory_reserved() / 1E9 if torch.cuda.is_available() else 0:.3g}G"  # (GB)
 
         # 在进程 0 中打印平均 loss
-        if dist.get_rank() == 0:
-            data_loader.desc = "[epoch {}]".format(epoch + 1)
-            data_loader.postfix = "loss (mean): {:.4f}".format(mean_loss.item())
+        if rank == 0:
+            data_loader.set_description(f"{epoch_info:11s}{mem:11s}{mean_loss.item():<11.4g}")
 
         if not torch.isfinite(loss):
             print("WARNING: non-finite loss, ending training ", loss)
@@ -197,13 +230,22 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch):
 
 @torch.no_grad()
 def evaluate(model, data_loader, device):
+    """模型验证函数
+
+    Args:
+        model (nn.module): 模型对象
+        data_loader: 数据迭代器
+        device: 运算设备
+
+    Returns:
+        int: 类别预测正确数量
+    """
     model.eval()
 
     # 用于存储预测正确的样本个数
     sum_num = torch.zeros(1).to(device)
 
-    for data in data_loader:
-        images, labels = data
+    for images, labels in data_loader:
         pred = model(images.to(device))
         pred = torch.max(pred, dim=1)[1]
         sum_num += torch.eq(pred, labels.to(device)).sum()
@@ -228,9 +270,6 @@ def main(args):
     rank = args.rank
     device = torch.device(args.device)
     batch_size = args.batch_size
-    weights_path = args.weights
-    args.lr *= args.world_size  # 学习率要根据并行GPU的数量进行倍增
-    checkpoint_path = ""
 
     if rank == 0:  # 在第一个进程中打印信息，并实例化tensorboard
         print(args)
@@ -250,10 +289,10 @@ def main(args):
     val_sampler = torch.utils.data.distributed.DistributedSampler(test_data)
     ###
 
-    # 将样本索引每batch_size个元素组成一个list
+    # 将样本索引每 batch_size 个元素组成一个list
     train_batch_sampler = torch.utils.data.BatchSampler(train_sampler, batch_size, drop_last=True)
 
-    nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0, 8])  # number of workers
+    nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0, args.num_workers])  # number of workers
     if rank == 0:
         print("Using {} dataloader workers every process".format(nw))
     train_loader = torch.utils.data.DataLoader(
@@ -273,49 +312,35 @@ def main(args):
     # 实例化模型
     model = CNN().to(device)
 
-    # 如果存在预训练权重则载入
-    if os.path.exists(weights_path):
-        weights_dict = torch.load(weights_path, map_location=device)
-        load_weights_dict = {k: v for k, v in weights_dict.items() if model.state_dict()[k].numel() == v.numel()}
-        model.load_state_dict(load_weights_dict, strict=False)
-    else:
-        checkpoint_path = os.path.join(tempfile.gettempdir(), "initial_weights.pt")
-        # 如果不存在预训练权重，需要将第一个进程中的权重保存，然后其他进程载入，保持初始化权重一致
-        if rank == 0:
-            torch.save(model.state_dict(), checkpoint_path)
+    # 如果不存在预训练权重，需要将第一个进程中的权重保存，然后其他进程载入，保持初始化权重一致
+    checkpoint_path = os.path.join(tempfile.gettempdir(), "initial_weights.pt")
+    if rank == 0:
+        torch.save(model.state_dict(), checkpoint_path)
 
-        dist.barrier()
-        # 这里注意，一定要指定 map_location 参数，否则会导致第一块 GPU 占用更多资源
-        model.load_state_dict(torch.load(checkpoint_path, map_location=device))
-
-    # 是否冻结权重
-    if args.freeze_layers:
-        for name, para in model.named_parameters():
-            # 除最后的全连接层外，其他权重全部冻结
-            if "fc" not in name:
-                para.requires_grad_(False)
-    else:
-        # 只有训练带有 BN 结构的网络时使用 SyncBatchNorm 才有意义
-        if args.syncBN:
-            # 使用 SyncBatchNorm 后训练会更耗时
-            model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model).to(device)
+    dist.barrier()
+    # 这里注意，一定要指定 map_location 参数，否则会导致第一块 GPU 占用更多资源
+    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
 
     # 转为 DDP 模型
     model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
 
     # 初始化优化器
     pg = [p for p in model.parameters() if p.requires_grad]
-    optimizer = optim.SGD(pg, lr=args.lr, momentum=0.9, weight_decay=0.005)
+    optimizer = optim.SGD(pg, lr=args.lr * args.world_size, momentum=0.9, weight_decay=0.005)
     # Scheduler https://arxiv.org/pdf/1812.01187.pdf
     lf = lambda x: ((1 + math.cos(x * math.pi / args.epochs)) / 2) * (1 - args.lrf) + args.lrf  # cosine
     scheduler = lr_scheduler.LambdaLR(optimizer, lr_lambda=lf)
 
+    if rank == 0:
+        print(f"{'Epoch':11s}{'GPU_mem':11s}{'loss':11s}")
+
     for epoch in range(args.epochs):
         train_sampler.set_epoch(epoch)
 
-        mean_loss = train_one_epoch(
-            model=model, optimizer=optimizer, data_loader=train_loader, device=device, epoch=epoch
-        )
+        if rank == 0:
+            train_loader = tqdm(train_loader, bar_format="{l_bar}{bar:10}{r_bar}")
+
+        mean_loss = train_one_epoch(model, optimizer, train_loader, device, rank, f"{epoch+1}/{args.epochs}")
 
         scheduler.step()
 
@@ -323,7 +348,10 @@ def main(args):
         acc = sum_num / val_sampler.total_size
 
         if rank == 0:
-            print("[epoch {}] accuracy: {:.2f}%".format(epoch + 1, acc * 100))
+            # print(f"[Epoch {epoch+1}/{args.epochs}] Evaluating: accuracy: {acc * 100:.2f}%")
+            train_loader.set_description(
+                f"[Epoch {epoch+1} / {args.epochs}] loss - {mean_loss:.2f} accuracy - {acc*100:.2f}%"
+            )
             tags = ["loss", "accuracy", "learning_rate"]
             tb_writer.add_scalar(tags[0], mean_loss, epoch)
             tb_writer.add_scalar(tags[1], acc, epoch)
@@ -341,27 +369,5 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--epochs", type=int, default=30)
-    parser.add_argument("--batch-size", type=int, default=64)
-    parser.add_argument("--lr", type=float, default=0.001)
-    parser.add_argument("--lrf", type=float, default=0.1)
-
-    # 是否启用SyncBatchNorm
-    parser.add_argument("--syncBN", type=bool, default=True)
-
-    # 数据集所在根目录
-    # https://storage.googleapis.com/download.tensorflow.org/example_images/flower_photos.tgz
-    parser.add_argument("--data-path", type=str, default="./data")
-    parser.add_argument("--weights", type=str, default="", help="initial weights path")
-    parser.add_argument("--freeze-layers", type=bool, default=False)
-
-    # 以下参数不需要更改，会自动分配
-    parser.add_argument("--device", default="cuda", help="device id (i.e. 0 or 0,1 or cpu)")
-    # 开启的进程数(注意不是线程),不用设置该参数，会根据nproc_per_node自动设置
-    parser.add_argument("--world-size", default=4, type=int, help="number of distributed processes")
-    parser.add_argument("--dist-url", default="env://", help="url used to set up distributed training")
-
-    opt = parser.parse_args()
-
+    opt = init_parse_args()
     main(opt)
