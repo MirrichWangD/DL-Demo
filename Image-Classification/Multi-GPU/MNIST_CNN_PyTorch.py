@@ -37,7 +37,6 @@ import torch.nn as nn
 
 # 导入优化器相关模块
 import torch.optim as optim
-import torch.optim.lr_scheduler as lr_scheduler
 
 # 导入分布式训练相关模块
 import torch.distributed as dist
