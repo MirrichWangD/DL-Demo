@@ -56,31 +56,29 @@ from torchvision.datasets import CIFAR10
 
 
 def init_parse_args():
+    """外部标识符参数初始化函数"""
     parser = argparse.ArgumentParser()
-    # 数据集所在根目录
-    parser.add_argument("--data-path", type=str, default="./data")
-    # 文件输出路径
-    parser.add_argument("--output", type=str, default="./weights/CIFAR10_DenseNet121_PyTorch")
 
-    # 训练周期和批次大小
-    parser.add_argument("--epochs", type=int, default=30)
-    parser.add_argument("--batch-size", type=int, default=256)
+    parser.add_argument("--data-path", type=str, default="./data")  # 数据集所在目录文件
+    parser.add_argument("--download", type=bool, default=True)  # 是否下载数据
+    parser.add_argument("--output", type=str, default="./weights/CIFAR10_DenseNet121_PyTorch")  # 文件输出路径
+
+    parser.add_argument("--epochs", type=int, default=30)  # 训练周期
+    parser.add_argument("--batch-size", type=int, default=256)  # 训练批次大小
+
     # 优化器参数
-    parser.add_argument("--lr", type=float, default=0.3)
+    parser.add_argument("--lr", type=float, default=0.3)  # 基础学习率
     parser.add_argument("--momentum", type=float, default=0.9)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
 
-    # 模型预训练权重
-    parser.add_argument("--weights", type=str, default="", help="initial weights path")
-    # 是否需要冻结除输出部分 FC 层的参数
-    parser.add_argument("--freeze-layers", type=bool, default=False)
+    parser.add_argument("--weights", type=str, default="", help="initial weights path")  # 模型预训练权重
+    parser.add_argument("--freeze-layers", type=bool, default=False)  # 是否需要冻结除输出部分 FC 层的参数
 
     # 分布式配置
     parser.add_argument("--dist-backend", default="nccl", type=str, help="please use 'gloo' on windows platform")
     parser.add_argument("--dist-url", default="env://", help="url used to set up distributed training")
-    parser.add_argument("--num-workers", default=4, type=int)
-    # 是否启用SyncBatchNorm
-    parser.add_argument("--syncBN", type=bool, default=True)
+    parser.add_argument("--num-workers", default=4, type=int)  # 每个进程数据迭代器的线程数
+    parser.add_argument("--syncBN", type=bool, default=True)  # 是否启用SyncBatchNorm
     # 以下参数不需要更改，会根据 nproc_per_node 自动设置
     parser.add_argument("--device", default="cuda", help="device id (i.e. 0 or 0,1 or cpu)")
     parser.add_argument("--world-size", default=4, type=int, help="number of distributed processes")
@@ -210,8 +208,7 @@ class DenseNet121(nn.Module):
         drop_rate: float = 0,
         n_classes: int = 1000,
     ) -> None:
-        """
-        DenseNet构造函数
+        """DenseNet构造函数
 
         Args:
             growth_rate (int, optional): k通道增长倍率. Defaults to 32.
@@ -293,14 +290,15 @@ def train_one_epoch(model, optimizer, data_loader, device, rank, epoch_info):
     """模型训练一个周期函数
 
     Args:
-        model (nn.module): 模型对象
+        model (nn.module): 模型架构对象
         optimizer: 优化器对象
         data_loader: 数据迭代器
         device: 运算设备
+        rank (int): 进程序号
         epoch_info (str): 周期字符串信息
 
     Returns:
-        float: 当前周期下模型训练损失平均值
+        mean_loss: 当前周期下模型训练损失平均值
     """
     model.train()
     criterion = torch.nn.CrossEntropyLoss()
@@ -381,6 +379,7 @@ def evaluate(model, data_loader, device):
 
 
 def main(args):
+    """脚本主函数"""
     if torch.cuda.is_available() is False:
         raise EnvironmentError("not find GPU device for training.")
 
@@ -402,16 +401,16 @@ def main(args):
         if os.path.exists(args.output) is False:
             os.makedirs(args.output)
 
-    ###
+    # 根据数据集路径获取训练和测试数据
     train_data, test_data = load_data(args.data_path)
     # 给每个rank对应的进程分配训练的样本索引
     train_sampler = torch.utils.data.distributed.DistributedSampler(train_data)
     val_sampler = torch.utils.data.distributed.DistributedSampler(test_data)
-    ###
 
     # 将样本索引每 batch_size 个元素组成一个list
     train_batch_sampler = torch.utils.data.BatchSampler(train_sampler, batch_size, drop_last=True)
 
+    # 分配读取数据的线程数
     nw = min([os.cpu_count(), batch_size if batch_size > 1 else 0, args.num_workers])  # number of workers
     if rank == 0:
         print("Using {} dataloader workers every process".format(nw))
@@ -429,7 +428,8 @@ def main(args):
         pin_memory=True,
         num_workers=nw,
     )
-    # 实例化模型
+
+    # 初始化 DenseNet121 对象
     model = DenseNet121(12, (5, 10, 20), n_classes=10, drop_rate=0.1).to(device)
 
     # 如果存在预训练权重则载入
