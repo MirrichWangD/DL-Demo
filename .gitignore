@@ -1,6 +1,8 @@
 # 自定义目录
 data/
 ckpt/
+weights/
+runs/
 output/
 # Byte-compiled / optimized / DLL files
 __pycache__/
