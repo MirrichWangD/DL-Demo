@@ -351,7 +351,7 @@ def evaluate(model, data_loader, device):
         device: 运算设备
 
     Returns:
-        int: 类别预测正确数量
+        mean_loss, correct: 验证损失, 类别预测正确数量
     """
     model.eval()
     criterion = torch.nn.CrossEntropyLoss()
