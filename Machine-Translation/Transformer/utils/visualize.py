@@ -14,10 +14,26 @@
 - Source Token
 - Target Token
 - Positional Encoding
+指定 eng-zh.txt 文档的 29366 行 - 29370 行数据：
+"Tom doesn't like to use the term ""a person of color"" because he thinks it implies that white people have no color."
+汤姆不喜欢使用”有色人种“这个术语，因为他认为，根据这种说法白种人没有颜色。
+
+If you don't want to put on sunscreen, that's your problem. Just don't come complaining to me when you get a sunburn.
+你不想涂防晒霜是你的问题，但是晒伤了不要来抱怨。
+
+Even now, I occasionally think I'd like to see you. Not the you that you are today, but the you I remember from the past.
+即使是现在，我偶尔还是想见到你。不是今天的你，而是我记忆中曾经的你。
+
+It's very easy to sound natural in your own native language, and very easy to sound unnatural in your non-native language.
+你很容易把母语说得通顺流畅，却很容易把非母语说得不自然。
+
+I got fired from the company, but since I have a little money saved up, for the time being, I won't have trouble with living expenses.
+虽然我被公司解雇了，但是我还有点存款，所以目前不用担心生计问题。
 +++++++++++++++++++++++++++++++++++
 """
 
 # 导入基础模块
+import os
 import math
 import warnings
 
@@ -34,10 +50,9 @@ import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
-from torch.utils.data import Dataset, DataLoader, BatchSampler
+from torch.utils.data import Dataset
 from torchtext.data import get_tokenizer
 from torchtext.vocab import build_vocab_from_iterator
-
 
 """+++++++++++++++++++++++++++
 @@@ Config
@@ -51,10 +66,6 @@ SPECIALS = ["<pad>", "<unk>", "<bos>", "<eos>"]
 # 注意！运行时请确保输入的 src_lang 和 tgt_lang 能够在此查询到相对应的 Spacy 语言模块，否则会构造数据集时报错
 SPACY = {"en": "en_core_web_sm", "zh": "zh_core_web_sm"}
 LANGUAGE = {"en": 0, "zh": 1}
-# 设置绘图参数
-plt.rcParams["font.family"] = ["Microsoft YaHei"]  # 使用微软雅黑字体
-cmap = sns.cubehelix_palette(start=1.5, rot=3, gamma=0.8, as_cmap=True)
-
 
 """++++++++++++++++++++
 @@@ 位置编码层
@@ -213,131 +224,135 @@ def create_mask(src: torch.Tensor, tgt: torch.Tensor) -> object:
 
 
 if __name__ == "__main__":
+    # 设置绘图参数
+    plt.rcParams["font.family"] = ["Microsoft YaHei"]  # 使用微软雅黑字体
+    cmap = sns.cubehelix_palette(start=1.5, rot=3, gamma=0.8, as_cmap=True)
+    # 输出文件夹
+    output_dir = "imgs"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     # 可视化 Positional Encoding
     PE = PositionalEncoding(emb_size=512, dropout=0.1)
-    # 保存图片
+
     sns.heatmap(PE.pos_embedding[:1024, 0], cmap=cmap)
-    plt.title("Positional Encoding ($d_{model}=512$)")
+    plt.title("Positional Encoding")
     plt.ylabel("Length")
     plt.xlabel("$d_{model}=512$")
     plt.tight_layout()
-    plt.savefig("imgs/positional_encoding.png")
+    plt.savefig(f"{output_dir}/positional_encoding.png")
 
     # 构造数据集
     dataset = TranslationDataset(file_path="../Tab-Separator/data/eng-zh.txt", src_lang="en", tgt_lang="zh")
     print(dataset)
 
-    # 划分训练、验证、测试集，分批
-    indices = np.arange(len(dataset))[::-1]
-    batch_sampler = BatchSampler(indices, 32, False)
-    # 生成数据迭代器
-    db = DataLoader(dataset, batch_sampler=batch_sampler, num_workers=0, collate_fn=collate_fn)
+    # 指定特定索引数据（ eng-zh.txt 文件的 29366 行 - 29370 行）
+    data_idx = [29365, 29366, 29367, 29368, 29369]
+    data = [(dataset[idx][0], dataset[idx][1]) for idx in data_idx]
+    src, tgt = collate_fn(data)
 
-    for src, tgt in db:
-        if src.shape[0] == 16:
-            # 生成绘图对象
-            fig = [plt.subplots(1, 1) for _ in range(2)]
-            figs = [plt.subplots(1, 4, figsize=(6, 4)) for _ in range(4)]
+    # 生成绘图对象
+    fig = [plt.subplots(1, 1, figsize=(8, 8)) for _ in range(2)]
+    figs = [plt.subplots(1, 5, figsize=(7, 7)) for _ in range(4)]
 
-            # 生成 mask
-            src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt[:-1, :])
+    # 生成 mask
+    src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt[:-1, :])
 
-            sns.heatmap(src_mask, ax=fig[0][1], cbar=False, annot=True, fmt=".0f")
-            sns.heatmap(tgt_mask, ax=fig[1][1], cbar=False, annot=True, fmt=".0f")
+    sns.heatmap(src_mask, ax=fig[0][1], cbar=False, annot=True, fmt=".0f")
+    sns.heatmap(tgt_mask, ax=fig[1][1], cbar=False, annot=True, fmt=".0f")
 
-            for idx in range(0, 4):
-                # 获取数据，生成句子列表
-                src_token = src[:, idx * 8 : (idx * 8) + 1]
-                src_sentence = dataset.src_vocab.lookup_tokens(src_token.flatten().tolist())
-                tgt_token = tgt[:, idx * 8 : (idx * 8) + 1]
-                tgt_sentence = dataset.tgt_vocab.lookup_tokens(tgt_token.flatten().tolist())
+    for i in range(len(data_idx)):
+        # 处理部分需要的数据
+        src_token = src[:, i : i + 1]
+        src_sentence = dataset.src_vocab.lookup_tokens(src_token.flatten().tolist())
+        tgt_token = tgt[:, i : i + 1]
+        tgt_sentence = dataset.tgt_vocab.lookup_tokens(tgt_token.flatten().tolist())
 
-                # %% 词向量可视化绘图
-                sns.heatmap(
-                    src_token,
-                    ax=figs[0][1][idx],
-                    cbar=False,
-                    annot=True,
-                    fmt=".0f",
-                    xticklabels=[idx],
-                    cmap=cmap,
-                )
-                sns.heatmap(
-                    tgt_token,
-                    ax=figs[1][1][idx],
-                    cbar=False,
-                    annot=True,
-                    fmt=".0f",
-                    xticklabels=[idx],
-                    cmap=cmap,
-                )
-                # 设置坐标轴为词
-                figs[0][1][idx].set_yticks(
-                    np.linspace(0.5, src.shape[0] - 0.5, src.shape[0]),
-                    rotation=0,
-                    labels=src_sentence,
-                )
-                figs[1][1][idx].set_yticks(
-                    np.linspace(0.5, tgt.shape[0] - 0.5, tgt.shape[0]),
-                    rotation=0,
-                    labels=tgt_sentence,
-                )
+        # 词向量可视化绘图
+        sns.heatmap(
+            src_token,
+            ax=figs[0][1][i],
+            cbar=False,
+            annot=True,
+            fmt=".0f",
+            xticklabels=[i],
+            cmap=cmap,
+        )
+        sns.heatmap(
+            tgt_token,
+            ax=figs[1][1][i],
+            cbar=False,
+            annot=True,
+            fmt=".0f",
+            xticklabels=[i],
+            cmap=cmap,
+        )
+        # 设置坐标轴为词
+        figs[0][1][i].set_yticks(
+            np.linspace(0.5, src.shape[0] - 0.5, src.shape[0]),
+            rotation=0,
+            labels=src_sentence,
+        )
+        figs[1][1][i].set_yticks(
+            np.linspace(0.5, tgt.shape[0] - 0.5, tgt.shape[0]),
+            rotation=0,
+            labels=tgt_sentence,
+        )
 
-                # %% 绘制 mask 相关图片
-                sns.heatmap(
-                    src_padding_mask[idx].unsqueeze(1),
-                    ax=figs[2][1][idx],
-                    cbar=False,
-                    annot=True,
-                    fmt=".0f",
-                    xticklabels=[idx],
-                    cmap=cmap,
-                )
-                sns.heatmap(
-                    tgt_padding_mask[idx].unsqueeze(1),
-                    ax=figs[3][1][idx],
-                    cbar=False,
-                    annot=True,
-                    fmt=".0f",
-                    xticklabels=[idx],
-                    cmap=cmap,
-                )
-                # 设置坐标轴为词
-                figs[2][1][idx].set_yticks(
-                    np.linspace(0.5, src.shape[0] - 0.5, src.shape[0]),
-                    rotation=0,
-                    labels=src_sentence,
-                )
-                figs[3][1][idx].set_yticks(
-                    np.linspace(0.5, tgt[:-1, :].shape[0] - 0.5, tgt[:-1, :].shape[0]),
-                    rotation=0,
-                    labels=tgt_sentence[:-1],
-                )
+        # 绘制 mask 相关图片
+        sns.heatmap(
+            src_padding_mask[i].unsqueeze(1),
+            ax=figs[2][1][i],
+            cbar=False,
+            annot=True,
+            fmt=".0f",
+            xticklabels=[i],
+            cmap=cmap,
+        )
+        sns.heatmap(
+            tgt_padding_mask[i].unsqueeze(1),
+            ax=figs[3][1][i],
+            cbar=False,
+            annot=True,
+            fmt=".0f",
+            xticklabels=[i],
+            cmap=cmap,
+        )
+        # 设置坐标轴为词
+        figs[2][1][i].set_yticks(
+            np.linspace(0.5, src.shape[0] - 0.5, src.shape[0]),
+            rotation=0,
+            labels=src_sentence,
+        )
+        figs[3][1][i].set_yticks(
+            np.linspace(0.5, tgt[:-1, :].shape[0] - 0.5, tgt[:-1, :].shape[0]),
+            rotation=0,
+            labels=tgt_sentence[:-1],
+        )
 
-            # 保存 Padding Mask 可视化图片
-            fig[0][0].suptitle("Source Mask (en)")
-            fig[0][0].tight_layout()
-            fig[0][0].savefig("imgs/src_mask.png")
+    # 保存 Padding Mask 可视化图片
+    fig[0][0].suptitle("Source Mask (en)")
+    fig[0][0].tight_layout()
+    fig[0][0].savefig(f"{output_dir}/src_mask.png")
 
-            fig[1][0].suptitle("Target Mask (zh)")
-            fig[1][0].tight_layout()
-            fig[1][0].savefig("imgs/tgt_mask.png")
+    fig[1][0].suptitle("Target Mask (zh)")
+    fig[1][0].tight_layout()
+    fig[1][0].savefig(f"{output_dir}/tgt_mask.png")
 
-            # 保存 Sentence Token 可视化图片
-            figs[0][0].suptitle("Source Token (en)")
-            figs[0][0].tight_layout()
-            figs[0][0].savefig("imgs/src_token.png")
+    # 保存 Sentence Token 可视化图片
+    figs[0][0].suptitle("Source Token (en)")
+    figs[0][0].tight_layout()
+    figs[0][0].savefig(f"{output_dir}/src_token.png")
 
-            figs[1][0].suptitle("Target Token (zh)")
-            figs[1][0].tight_layout()
-            figs[1][0].savefig("imgs/tgt_token.png")
+    figs[1][0].suptitle("Target Token (zh)")
+    figs[1][0].tight_layout()
+    figs[1][0].savefig(f"{output_dir}/tgt_token.png")
 
-            # 保存 Sentence Mask 可视化图片
-            figs[2][0].suptitle("Source Padding Mask (en)")
-            figs[2][0].tight_layout()
-            figs[2][0].savefig("imgs/src_padding_mask.png")
+    # 保存 Sentence Mask 可视化图片
+    figs[2][0].suptitle("Source Padding Mask (en)")
+    figs[2][0].tight_layout()
+    figs[2][0].savefig(f"{output_dir}/src_padding_mask.png")
 
-            figs[3][0].suptitle("Target Padding Mask (zh)")
-            figs[3][0].tight_layout()
-            figs[3][0].savefig("imgs/tgt_padding_mask.png")
-            break
+    figs[3][0].suptitle("Target Padding Mask (zh)")
+    figs[3][0].tight_layout()
+    figs[3][0].savefig(f"{output_dir}/tgt_padding_mask.png")
