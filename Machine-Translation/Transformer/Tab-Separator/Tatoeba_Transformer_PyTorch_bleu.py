@@ -98,8 +98,8 @@ def get_args_parser():
     parser.add_argument("--n_enc_layers", default=6, type=int, help="Encoder编码器层数")
     parser.add_argument("--n_dec_layers", default=6, type=int, help="Decoder解码器层数")
     parser.add_argument("--n_heads", default=8, type=int, help="多头注意力头的数量")
-    parser.add_argument("--d_model", default=512, type=int, help="Embedding嵌入层维数")
-    parser.add_argument("--d_ff", default=2048, type=int, help="FFN维数")
+    parser.add_argument("--d_model", default=64, type=int, help="Embedding嵌入层维数")
+    parser.add_argument("--d_ff", default=256, type=int, help="FFN维数")
     parser.add_argument("--dropout", default=0.1, type=float, help="LN层Dropout比例")
     parser.add_argument("--resume", default=None, type=str, help="导入模型权重路径")
 
@@ -107,7 +107,7 @@ def get_args_parser():
     parser.add_argument("--mode", default="train", choices=["train", "eval"], help="脚本模式，train：训练；eval：验证")
     parser.add_argument("--epochs", default=100, type=int, help="训练轮数")
     parser.add_argument("--lr", default=0.0001, type=float, help="学习率")
-    parser.add_argument("--batch_size", default=64, type=int, help="批数量")
+    parser.add_argument("--batch_size", default=128, type=int, help="批数量")
     parser.add_argument("--n_workers", default=0, type=int, help="读取数据进程数，使用交互式窗口运行时请设置为0")
     parser.add_argument("--device", default="cuda:0", type=str, help="运算设备")
     parser.add_argument("--output", default=None, type=str, help="训练结果保存路径")
@@ -157,10 +157,10 @@ class TranslationDataset(Dataset):
         # 迭代原始数据，进行分词处理
         data = texts[[LANGUAGE[src_lang], LANGUAGE[tgt_lang]]].values
         for src, tgt in tqdm(data, total=self.length, desc="Loading Data"):
-            src = re.sub("\s+", " ", src)
-            tgt = re.sub("\s+", " ", tgt)
-            self.src_sentences.append(self.src_tokenizer(src)[:max_len])
-            self.tgt_sentences.append(self.tgt_tokenizer(tgt)[:max_len])
+            src = re.sub(r"\s+", " ", src)
+            tgt = re.sub(r"\s+", " ", tgt)
+            self.src_sentences.append(self.src_tokenizer(src)[: max_len - 2])
+            self.tgt_sentences.append(self.tgt_tokenizer(tgt)[: max_len - 2])
 
         # 构建词汇表对象
         if src_dict is not None:
@@ -186,14 +186,13 @@ class TranslationDataset(Dataset):
 
     def __repr__(self):
         """字符串可视化显示数据集信息"""
-        return (
-            " Dataset Info ".center(50, "=")
-            + "\n"
-            + "| %-21s | %-22s |\n" % ("size", self.length)
-            + "| %-21s | %-22s |\n" % (f"src vocab: {self.src_lang}", len(self.src_vocab))
-            + "| %-21s | %-22s |\n" % (f"tgt vocab: {self.tgt_lang}", len(self.tgt_vocab))
-            + "=" * 50
-        )
+        s_str = " Dataset Info ".center(50, "=") + "\n"
+        s_str += "| %-21s | %-22s |\n" % ("size", self.length)
+        s_str += "| %-21s | %-22s |\n" % (f"src vocab: {self.src_lang}", len(self.src_vocab))
+        s_str += "| %-21s | %-22s |\n" % (f"tgt_vocab: {self.tgt_lang}", len(self.tgt_vocab))
+        s_str += "=" * 50
+
+        return s_str
 
     def __getitem__(self, idx):
         """根据索引 idx 获取 src、tgt 的 tokens"""
@@ -319,6 +318,7 @@ class Transformer(nn.Module):
         num_dec_layers: int,
         d_model: int,
         n_head: int,
+        max_len: int,
         src_vocab_size: int,
         tgt_vocab_size: int,
         dim_feedforward: int = 512,
@@ -337,7 +337,7 @@ class Transformer(nn.Module):
         self.generator = nn.Linear(d_model, tgt_vocab_size)
         self.src_tok_emb = TokenEmbedding(src_vocab_size, d_model)
         self.tgt_tok_emb = TokenEmbedding(tgt_vocab_size, d_model)
-        self.positional_encoding = PositionalEncoding(d_model, dropout=dropout)
+        self.positional_encoding = PositionalEncoding(d_model, dropout=dropout, max_len=max_len)
 
     def forward(
         self,
@@ -352,14 +352,14 @@ class Transformer(nn.Module):
         src_emb = self.positional_encoding(self.src_tok_emb(src))
         tgt_emb = self.positional_encoding(self.tgt_tok_emb(trg))
         outs = self.transformer(
-            src_emb,
-            tgt_emb,
-            src_mask,
-            tgt_mask,
+            src_emb,  # src
+            tgt_emb,  # tgt_input
+            src_mask,  # src_mask
+            tgt_mask,  # tgt_mask
             None,
-            src_padding_mask,
-            tgt_padding_mask,
-            memory_key_padding_mask,
+            src_padding_mask,  # src_padding_mask
+            tgt_padding_mask,  # tgt_padding_mask
+            memory_key_padding_mask,  # src_padding_mask
         )
         return self.generator(outs)
 
@@ -445,7 +445,19 @@ def main(args):
     args.device = torch.device(args.device) if torch.cuda.is_available() else torch.device("cpu")
     # 获取输出目录
     if args.output is None:
-        output_dir = Path(f"output/{args.src_lang}-{args.tgt_lang}_BLEU")
+        output_dir = Path(
+            "output/%s-%s/e%dd%dh%ddm%ddf%dml%d"
+            % (
+                args.src_lang,
+                args.tgt_lang,
+                args.n_enc_layers,
+                args.n_dec_layers,
+                args.n_heads,
+                args.d_model,
+                args.d_ff,
+                args.max_len,
+            )
+        )
     else:
         output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -463,6 +475,7 @@ def main(args):
         tgt_lang=args.tgt_lang,
         src_dict=args.src_dict,
         tgt_dict=args.tgt_dict,
+        max_len=args.max_len,
     )
     print(dataset)
 
@@ -506,6 +519,7 @@ def main(args):
         args.n_dec_layers,
         args.d_model,
         args.n_heads,
+        args.max_len,
         len(dataset.src_vocab),
         len(dataset.tgt_vocab),
         args.d_ff,
