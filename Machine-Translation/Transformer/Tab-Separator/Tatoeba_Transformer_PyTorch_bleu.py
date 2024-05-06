@@ -58,7 +58,6 @@ warnings.filterwarnings("ignore")
 @@@ 全局变量
 ++++++++++++++++++++++++"""
 
-LANGUAGE = {}
 # 定义特殊TOKENdd
 PAD_IDX, UNK_IDX, BOS_IDX, EOS_IDX = 0, 1, 2, 3
 SPECIALS = ["<pad>", "<unk>", "<bos>", "<eos>"]
@@ -89,7 +88,7 @@ def get_args_parser():
     parser.add_argument("--tgt_lang", default="zh", type=str, help="输出语言，如zh：简中")
     parser.add_argument("--src_dict", default=None, type=str, help="输入语言词典txt文件")
     parser.add_argument("--tgt_dict", default=None, type=str, help="输出语言词典txt文件")
-    parser.add_argument("--max_len", default=40, type=int, help="句子向量最大长度")
+    parser.add_argument("--max_len", default=256, type=int, help="句子向量最大长度")
     parser.add_argument("--min_freq", default=1, type=str, help="词频最少数量，小于该数将不会加载进词汇中")
     parser.add_argument("--val_size", default=1000, type=int, help="验证数据量")
     parser.add_argument("--test_size", default=100, type=int, help="测试数据量")
@@ -98,8 +97,8 @@ def get_args_parser():
     parser.add_argument("--n_enc_layers", default=6, type=int, help="Encoder编码器层数")
     parser.add_argument("--n_dec_layers", default=6, type=int, help="Decoder解码器层数")
     parser.add_argument("--n_heads", default=8, type=int, help="多头注意力头的数量")
-    parser.add_argument("--d_model", default=64, type=int, help="Embedding嵌入层维数")
-    parser.add_argument("--d_ff", default=256, type=int, help="FFN维数")
+    parser.add_argument("--d_model", default=512, type=int, help="Embedding嵌入层维数")
+    parser.add_argument("--d_ff", default=2048, type=int, help="FFN维数")
     parser.add_argument("--dropout", default=0.1, type=float, help="LN层Dropout比例")
     parser.add_argument("--resume", default=None, type=str, help="导入模型权重路径")
 
@@ -107,7 +106,7 @@ def get_args_parser():
     parser.add_argument("--mode", default="train", choices=["train", "eval"], help="脚本模式，train：训练；eval：验证")
     parser.add_argument("--epochs", default=100, type=int, help="训练轮数")
     parser.add_argument("--lr", default=0.0001, type=float, help="学习率")
-    parser.add_argument("--batch_size", default=128, type=int, help="批数量")
+    parser.add_argument("--batch_size", default=32, type=int, help="批数量")
     parser.add_argument("--n_workers", default=0, type=int, help="读取数据进程数，使用交互式窗口运行时请设置为0")
     parser.add_argument("--device", default="cuda:0", type=str, help="运算设备")
     parser.add_argument("--output", default=None, type=str, help="训练结果保存路径")
@@ -141,6 +140,7 @@ class TranslationDataset(Dataset):
             tgt_lang: str 翻译数据列索引
         """
         super().__init__()
+        self.max_len = max_len
         self.src_lang = src_lang
         self.tgt_lang = tgt_lang
         self.src_sentences = []
@@ -155,23 +155,21 @@ class TranslationDataset(Dataset):
         self.tgt_tokenizer = get_tokenizer("spacy", language=SPACY[tgt_lang])
 
         # 迭代原始数据，进行分词处理
-        data = texts[[LANGUAGE[src_lang], LANGUAGE[tgt_lang]]].values
-        for src, tgt in tqdm(data, total=self.length, desc="Loading Data"):
-            src = re.sub(r"\s+", " ", src)
-            tgt = re.sub(r"\s+", " ", tgt)
-            self.src_sentences.append(self.src_tokenizer(src)[: max_len - 2])
-            self.tgt_sentences.append(self.tgt_tokenizer(tgt)[: max_len - 2])
+        data = texts.values[:, :2]
+        for src, tgt in tqdm(data, total=self.length, desc="Data Tokenizing"):
+            self.src_sentences.append(self.src_tokenizer(src))
+            self.tgt_sentences.append(self.tgt_tokenizer(tgt))
 
         # 构建词汇表对象
         if src_dict is not None:
-            with open(src_dict, encoding="utf-8") as f:
-                src_words = list(map(lambda i: i.strip(), f.readlines()))
+            with open(src_dict, encoding="utf-8") as fp:
+                src_words = list(map(lambda i: i.rstrip(), fp.readlines()))
             self.src_vocab = vocab(OrderedDict(zip(src_words, [10] * len(src_words))))
         else:
             self.src_vocab = build_vocab_from_iterator(self.src_sentences, min_freq, specials=SPECIALS)
         if tgt_dict is not None:
-            with open(tgt_dict, encoding="utf-8") as f:
-                tgt_words = list(map(lambda i: i.strip(), f.readlines()))
+            with open(tgt_dict, encoding="utf-8") as fp:
+                tgt_words = list(map(lambda i: i.rstrip(), fp.readlines()))
             self.tgt_vocab = vocab(OrderedDict(zip(tgt_words, [10] * len(tgt_words))))
         else:
             self.tgt_vocab = build_vocab_from_iterator(self.tgt_sentences, min_freq, specials=SPECIALS)
@@ -199,7 +197,7 @@ class TranslationDataset(Dataset):
         # 通过 vocab 获取 token，并且前后插入起始、终止符号
         src = [BOS_IDX] + self.src_vocab.lookup_indices(self.src_sentences[idx]) + [EOS_IDX]
         tgt = [BOS_IDX] + self.tgt_vocab.lookup_indices(self.tgt_sentences[idx]) + [EOS_IDX]
-        return torch.tensor(src), torch.tensor(tgt)
+        return torch.tensor(src[: self.max_len]), torch.tensor(tgt[: self.max_len])
 
 
 """++++++++++++++++++++++
@@ -279,7 +277,7 @@ def collate_fn(batch):
 class PositionalEncoding(nn.Module):
     """位置编码层"""
 
-    def __init__(self, emb_size: int, dropout: float, max_len: int = 5000):
+    def __init__(self, emb_size: int, dropout: float, max_len: int = 256):
         super(PositionalEncoding, self).__init__()
         den = torch.exp(-torch.arange(0, emb_size, 2) * math.log(10000) / emb_size)
         pos = torch.arange(0, max_len).reshape(max_len, 1)
@@ -401,7 +399,6 @@ def greedy_decode(model: nn.Module, src: Tensor, src_mask: Tensor, max_len: int,
         src_mask: torch.Tensor 输入词向量 mask (S_src, S_src)
         max_len: int 预测最大句子长度，通常时 S_src + 5
         start_symbol: int 起始符索引，默认为 2
-        device: torch.device 运算设备
 
     Returns:
         Tensor(S_pred, 1)
@@ -434,13 +431,9 @@ def main(args):
     torch.cuda.manual_seed_all(args.seed)
     torch.backends.cudnn.deterministic = True
 
-    # 将输入和翻译语言构造索引
-    LANGUAGE[args.src_lang] = 0
-    LANGUAGE[args.tgt_lang] = 1
     if args.src_lang not in SPACY.keys() or args.tgt_lang not in SPACY.keys():
         raise "请确保 spacy 模块中是否包含设置的输入、输出语言！"
-    # 设置开始轮数
-    start_epoch = 0
+
     # 设置训练硬件
     args.device = torch.device(args.device) if torch.cuda.is_available() else torch.device("cpu")
     # 获取输出目录
@@ -531,9 +524,7 @@ def main(args):
     # 设置断点训练
     if args.resume:
         resume = torch.load(args.resume)
-        start_epoch = resume["epoch"] - 1
-        model.load_state_dict(resume["model"])
-        optimizer.load_state_dict(resume["optimizer"])
+        model.load_state_dict(resume)
 
     # ---------------------------- #
     # Training and Evaluate Model
@@ -564,7 +555,7 @@ def main(args):
         }
 
         st = time.time()
-        for epoch in range(start_epoch, args.epochs):
+        for epoch in range(args.epochs):
             with tqdm(total=len(train_db), desc=f"Epoch: {epoch + 1}/{args.epochs}") as pbar:  # 训练进度条
                 # 初始化准确率计算变量
                 correct, total = {"train": 0, "val": 0}, {"train": 0, "val": 0}
@@ -713,8 +704,8 @@ def main(args):
 
         # 绘制损失图
         plt.figure()
-        plt.plot(np.mean(train_history["loss"]["train"][start_epoch : args.epochs + 1], 1), label="Train")
-        plt.plot(np.mean(train_history["loss"]["val"][start_epoch : args.epochs + 1], 1), label="Val")
+        plt.plot(np.mean(train_history["loss"]["train"], 1), label="Train")
+        plt.plot(np.mean(train_history["loss"]["val"], 1), label="Val")
         plt.legend(loc="best")
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
@@ -722,8 +713,8 @@ def main(args):
         plt.savefig(output_dir / "metrics/loss.png")
         # 绘制精准率图
         plt.figure()
-        plt.plot(np.mean(train_history["bleu"]["train"][start_epoch : args.epochs + 1], 1), label="Train")
-        plt.plot(np.mean(train_history["bleu"]["val"][start_epoch : args.epochs + 1], 1), label="Val")
+        plt.plot(np.mean(train_history["bleu"]["train"], 1), label="Train")
+        plt.plot(np.mean(train_history["bleu"]["val"], 1), label="Val")
         plt.legend(loc="best")
         plt.xlabel("Epoch")
         plt.ylabel("Bleu")
