@@ -38,7 +38,6 @@ import re
 # 导入依赖模块
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
 
 # 导入torch相关模块
@@ -53,7 +52,6 @@ from torchtext.data import get_tokenizer, bleu_score
 
 # 设置忽略warning信息
 warnings.filterwarnings("ignore")
-
 """++++++++++++++++++++++++
 @@@ 全局变量
 ++++++++++++++++++++++++"""
@@ -69,7 +67,6 @@ SPACY = {
     "zh": "zh_core_web_sm",  # Chinese 简中
     "fr": "fr_core_news_sm",  # French 法语
 }
-
 """+++++++++++++++++++++++++
 @@@ 变量对象定义
 +++++++++++++++++++++++++"""
@@ -140,25 +137,24 @@ class TranslationDataset(Dataset):
             tgt_lang: str 翻译数据列索引
         """
         super().__init__()
+        self.length = 0
         self.max_len = max_len
         self.src_lang = src_lang
         self.tgt_lang = tgt_lang
         self.src_sentences = []
         self.tgt_sentences = []
 
-        # 读取原始数据，获取长度
-        texts = pd.read_table(file_path, header=None, encoding="utf-8")
-        self.length = texts.shape[0]
-
         # 通过 spacy 获取语言模型
         self.src_tokenizer = get_tokenizer("spacy", language=SPACY[src_lang])
         self.tgt_tokenizer = get_tokenizer("spacy", language=SPACY[tgt_lang])
 
         # 迭代原始数据，进行分词处理
-        data = texts.values[:, :2]
-        for src, tgt in tqdm(data, total=self.length, desc="Data Tokenizing"):
-            self.src_sentences.append(self.src_tokenizer(src))
-            self.tgt_sentences.append(self.tgt_tokenizer(tgt))
+        with open(file_path, encoding="utf-8") as fp:
+            for line in tqdm(fp, desc="Loading data", unit=""):
+                src, tgt = line.strip().split("\t")[:2]
+                self.src_sentences.append(self.src_tokenizer(src.strip()))
+                self.tgt_sentences.append(self.tgt_tokenizer(tgt.strip()))
+                self.length += 1
 
         # 构建词汇表对象
         if src_dict is not None:
@@ -197,7 +193,7 @@ class TranslationDataset(Dataset):
         # 通过 vocab 获取 token，并且前后插入起始、终止符号
         src = [BOS_IDX] + self.src_vocab.lookup_indices(self.src_sentences[idx]) + [EOS_IDX]
         tgt = [BOS_IDX] + self.tgt_vocab.lookup_indices(self.tgt_sentences[idx]) + [EOS_IDX]
-        return torch.tensor(src[: self.max_len]), torch.tensor(tgt[: self.max_len])
+        return torch.tensor(src[:self.max_len]), torch.tensor(tgt[:self.max_len])
 
 
 """++++++++++++++++++++++
@@ -290,20 +286,7 @@ class PositionalEncoding(nn.Module):
         self.register_buffer("pos_embedding", pos_embedding)
 
     def forward(self, token_embedding: Tensor):
-        return self.dropout(token_embedding + self.pos_embedding[: token_embedding.size(0), :])
-
-
-# helper Module to convert tensor of input indices into corresponding tensor of token embeddings
-class TokenEmbedding(nn.Module):
-    """词向量嵌入层"""
-
-    def __init__(self, vocab_size: int, emb_size):
-        super(TokenEmbedding, self).__init__()
-        self.embedding = nn.Embedding(vocab_size, emb_size)
-        self.emb_size = emb_size
-
-    def forward(self, tokens: Tensor):
-        return self.embedding(tokens.long()) * math.sqrt(self.emb_size)
+        return self.dropout(token_embedding + self.pos_embedding[:token_embedding.size(0), :])
 
 
 # Seq2Seq Network
@@ -333,8 +316,8 @@ class Transformer(nn.Module):
         )
         # 输出全连接层：由于使用的 nn.CrossEntropyLoss 因此不需要作 log_softmax 处理
         self.generator = nn.Linear(d_model, tgt_vocab_size)
-        self.src_tok_emb = TokenEmbedding(src_vocab_size, d_model)
-        self.tgt_tok_emb = TokenEmbedding(tgt_vocab_size, d_model)
+        self.src_tok_emb = nn.Embedding(src_vocab_size, d_model)
+        self.tgt_tok_emb = nn.Embedding(tgt_vocab_size, d_model)
         self.positional_encoding = PositionalEncoding(d_model, dropout=dropout, max_len=max_len)
 
     def forward(
@@ -438,19 +421,7 @@ def main(args):
     args.device = torch.device(args.device) if torch.cuda.is_available() else torch.device("cpu")
     # 获取输出目录
     if args.output is None:
-        output_dir = Path(
-            "output/%s-%s/e%dd%dh%ddm%ddf%dml%d"
-            % (
-                args.src_lang,
-                args.tgt_lang,
-                args.n_enc_layers,
-                args.n_dec_layers,
-                args.n_heads,
-                args.d_model,
-                args.d_ff,
-                args.max_len,
-            )
-        )
+        output_dir = Path(f"output/{args.src_lang}-{args.tgt_lang}/{time.strftime('%Y%m%d_%H%M%S', time.localtime())}")
     else:
         output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -475,49 +446,21 @@ def main(args):
     # 划分训练、验证、测试集，分批
     indices = np.arange(len(dataset))
     np.random.shuffle(indices)
-    train_sampler = BatchSampler(indices[: -(args.val_size + args.test_size)], args.batch_size, False)
-    val_sampler = BatchSampler(
-        indices[-(args.val_size + args.test_size) : -args.test_size],
-        args.batch_size,
-        False,
-    )
-    test_sampler = BatchSampler(indices[-args.test_size :], batch_size=1, drop_last=False)
+    train_sampler = BatchSampler(indices[:-(args.val_size + args.test_size)], args.batch_size, False)
+    val_sampler = BatchSampler(indices[-(args.val_size + args.test_size):-args.test_size], args.batch_size, False)
+    test_sampler = BatchSampler(indices[-args.test_size:], batch_size=1, drop_last=False)
 
     # 生成数据迭代器
-    train_db = DataLoader(
-        dataset,
-        batch_sampler=train_sampler,
-        num_workers=args.n_workers,
-        collate_fn=collate_fn,
-    )
-    val_db = DataLoader(
-        dataset,
-        batch_sampler=val_sampler,
-        num_workers=args.n_workers,
-        collate_fn=collate_fn,
-    )
-    test_db = DataLoader(
-        dataset,
-        batch_sampler=test_sampler,
-        num_workers=args.n_workers,
-        collate_fn=collate_fn,
-    )
+    train_db = DataLoader(dataset, batch_sampler=train_sampler, num_workers=args.n_workers, collate_fn=collate_fn)
+    val_db = DataLoader(dataset, batch_sampler=val_sampler, num_workers=args.n_workers, collate_fn=collate_fn)
+    test_db = DataLoader(dataset, batch_sampler=test_sampler, num_workers=args.n_workers, collate_fn=collate_fn)
 
     # ------------------------ #
     # Build Model
     # ------------------------ #
 
-    model = Transformer(
-        args.n_enc_layers,
-        args.n_dec_layers,
-        args.d_model,
-        args.n_heads,
-        args.max_len,
-        len(dataset.src_vocab),
-        len(dataset.tgt_vocab),
-        args.d_ff,
-        args.dropout,
-    ).to(args.device)
+    model = Transformer(args.n_enc_layers, args.n_dec_layers, args.d_model, args.n_heads, args.max_len,
+                        len(dataset.src_vocab), len(dataset.tgt_vocab), args.d_ff, args.dropout).to(args.device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, betas=(0.9, 0.98), eps=1e-9)
     criterion = nn.CrossEntropyLoss(ignore_index=PAD_IDX)
@@ -570,15 +513,8 @@ def main(args):
                     src_mask, tgt_mask, src_padding_mask, tgt_padding_mask = create_mask(src, tgt_input)
 
                     # 计算每个词的概率
-                    logits = model(
-                        src,
-                        tgt_input,
-                        src_mask,
-                        tgt_mask,
-                        src_padding_mask,
-                        tgt_padding_mask,
-                        src_padding_mask,
-                    )
+                    logits = model(src, tgt_input, src_mask, tgt_mask, src_padding_mask, tgt_padding_mask,
+                                   src_padding_mask)
 
                     optimizer.zero_grad()  # 初始化优化器梯度
 
@@ -598,10 +534,9 @@ def main(args):
                     total["train"] += L.sum().item()
                     correct["train"] += sum(
                         map(
-                            lambda i: (pred[: L[i], i] == tgt_out[: L[i], i]).sum().item(),
+                            lambda i: (pred[:L[i], i] == tgt_out[:L[i], i]).sum().item(),
                             range(pred.shape[1]),
-                        )
-                    )
+                        ))
 
                     # 记录损失、准确率
                     train_history["loss"]["train"][epoch].append(loss.item())
@@ -609,13 +544,11 @@ def main(args):
                     train_history["acc"]["train"][epoch].append(correct["train"] / total["train"])
                     # 更新进度条
                     pbar.update(1)
-                    pbar.set_postfix(
-                        {
-                            "loss": f"{np.mean(train_history['loss']['train'][epoch]).item():.4f}",
-                            "bleu": f"{np.mean(train_history['bleu']['train'][epoch]).item() * 100:.2f}%",
-                            "acc": f"{np.mean(train_history['acc']['train'][epoch]).item() * 100:.2f}%",
-                        }
-                    )
+                    pbar.set_postfix({
+                        "loss": f"{np.mean(train_history['loss']['train'][epoch]).item():.4f}",
+                        "bleu": f"{np.mean(train_history['bleu']['train'][epoch]).item() * 100:.2f}%",
+                        "acc": f"{np.mean(train_history['acc']['train'][epoch]).item() * 100:.2f}%",
+                    })
 
                 # 训练完一个 epoch 后进行验证
                 model.eval()
@@ -647,26 +580,23 @@ def main(args):
                     total["val"] += L.sum().item()
                     correct["val"] += sum(
                         map(
-                            lambda i: (pred[: L[i], i] == tgt_out[: L[i], i]).sum().item(),
+                            lambda i: (pred[:L[i], i] == tgt_out[:L[i], i]).sum().item(),
                             range(pred.shape[1]),
-                        )
-                    )
+                        ))
 
                     # 记录验证损失、准确率
                     train_history["loss"]["val"][epoch].append(loss.item())
                     train_history["bleu"]["val"][epoch].append(bleu)
                     train_history["acc"]["val"][epoch].append(correct["val"] / total["val"])
                     # 更新进度条
-                    pbar.set_postfix(
-                        {
-                            "loss": f"{np.mean(train_history['loss']['train'][epoch]).item():.4f}",
-                            "bleu": f"{np.mean(train_history['bleu']['train'][epoch]).item() * 100:.2f}%",
-                            "acc": f"{np.mean(train_history['acc']['train'][epoch]).item() * 100:.2f}%",
-                            "loss_val": f"{np.mean(train_history['loss']['val'][epoch]).item():.4f}",
-                            "bleu_val": f"{np.mean(train_history['bleu']['val'][epoch]).item() * 100:.2f}%",
-                            "acc_val": f"{np.mean(train_history['acc']['val'][epoch]).item() * 100:.2f}%",
-                        }
-                    )
+                    pbar.set_postfix({
+                        "loss": f"{np.mean(train_history['loss']['train'][epoch]).item():.4f}",
+                        "bleu": f"{np.mean(train_history['bleu']['train'][epoch]).item() * 100:.2f}%",
+                        "acc": f"{np.mean(train_history['acc']['train'][epoch]).item() * 100:.2f}%",
+                        "loss_val": f"{np.mean(train_history['loss']['val'][epoch]).item():.4f}",
+                        "bleu_val": f"{np.mean(train_history['bleu']['val'][epoch]).item() * 100:.2f}%",
+                        "acc_val": f"{np.mean(train_history['acc']['val'][epoch]).item() * 100:.2f}%",
+                    })
 
                 # 判断验证数据平均准确率是否大于最优准确率，若更高则保存 best_model.pth
                 if np.mean(train_history["bleu"]["val"][epoch]).item() > train_history["best_bleu"]:
@@ -748,21 +678,17 @@ def main(args):
             # 计算准确率
             L = (tgt_out != PAD_IDX).sum(0)
             total += L.sum().item()
-            correct += sum(
-                map(
-                    lambda i: (pred[: L[i], i] == tgt_out[: L[i], i]).sum().item(),
-                    range(pred.shape[1]),
-                )
-            )
+            correct += sum(map(
+                lambda i: (pred[:L[i], i] == tgt_out[:L[i], i]).sum().item(),
+                range(pred.shape[1]),
+            ))
 
             pbar.update(1)
-            pbar.set_postfix(
-                {
-                    "loss_val": f"{loss.item():.4f}",
-                    "bleu_val": f"{np.mean(bleu) * 100:.2f}%",
-                    "acc_val": f"{correct / total * 100:.2f}%",
-                }
-            )
+            pbar.set_postfix({
+                "loss_val": f"{loss.item():.4f}",
+                "bleu_val": f"{np.mean(bleu) * 100:.2f}%",
+                "acc_val": f"{correct / total * 100:.2f}%",
+            })
 
     # ------------------------ #
     # Prediction
