@@ -1,23 +1,51 @@
 <html>
+  <!--"https://tse1-mm.cn.bing.net/th/id/OIP-C.cQLSaunMvyKh5RiiOGeqXgHaHa?pid=ImgDet&rs=1"-->
+  <html>
+    <head>
+      <!-- Load the latest version of TensorFlow.js -->
+      <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+      <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>
+    </head>
+    <body>
+      <!-- Add an image that we will use to test -->
+      <img id="img" crossorigin src="https://i.imgur.com/JlUvsxa.jpg" width="227" height="227" />
+      <!-- Load index.js after the content of the page -->
+      <div id="console">Identifying...</div>
+      <script>
+        const img = document.getElementById("img");
 
-<!--"https://tse1-mm.cn.bing.net/th/id/OIP-C.cQLSaunMvyKh5RiiOGeqXgHaHa?pid=ImgDet&rs=1"-->
-<html>
-<head>
-    <!-- Load the latest version of TensorFlow.js -->
-    <!--  联网js  -->
-    <!--    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>-->
-    <!--    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet"></script>-->
-    <!--  本地js  -->
-    <script src="js/tfjs.js"></script>
-    <script src="js/mobilenet.js"></script>
-</head>
-<body>
-<!-- Add an image that we will use to test -->
-<img id="img" crossorigin src="data/dog.jpg" width="227" height="227"/>
-<!-- Load index.js after the content of the page -->
-<div id="console">Identifying...</div>
-<script src="js/index.js"></script>
+        async function run() {
+          console.log("Loading mobilenet");
 
-</body>
+          // Load the modelm
+          const net = await mobilenet.load();
+          console.log("Successfully loaded model");
 
+          // Make a prediction through the model on our image
+          const prediction = await net.classify(img);
+          console.log("prediction");
+          console.log(prediction);
+
+          // let html document show predictions
+          let resultHTML = `<table border='1'>
+            <thead>
+              <tr>
+                <th>className</th>
+                <th>probability</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+          prediction.map((r) => {
+            resultHTML += `<tr><th>${r.className}</th><th>${r.probability}</th></tr>`;
+          });
+          resultHTML += "</tbody></table>";
+
+          document.getElementById("console").innerHTML = resultHTML;
+        }
+
+        run();
+      </script>
+    </body>
+  </html>
 </html>

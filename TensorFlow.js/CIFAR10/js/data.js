@@ -22,11 +22,8 @@ const NUM_DATASET_ELEMENTS = 60000;  // 数据集样本数
 const NUM_TRAIN_ELEMENTS = 50000;  // 训练集数量
 const NUM_TEST_ELEMENTS = NUM_DATASET_ELEMENTS - NUM_TRAIN_ELEMENTS;  // 测试集数量
 // 联网数据
-// const IMAGES_SPRITE_PATH = 'https://storage.googleapis.com/learnjs-data/model-builder/cifar10_images.png';
-// const LABELS_PATH = 'https://storage.googleapis.com/learnjs-data/model-builder/cifar10_labels_uint8';
-// 本地数据
-const IMAGES_SPRITE_PATH = 'data/cifar10_images.png';  // 本地图像文件路径
-const LABELS_PATH = 'data/cifar10_labels_uint8';  // 本地图像标签路径
+const IMAGES_SPRITE_PATH = 'https://storage.googleapis.com/learnjs-data/model-builder/cifar10_images.png';
+const LABELS_PATH = 'https://storage.googleapis.com/learnjs-data/model-builder/cifar10_labels_uint8';
 
 export class Data {
     constructor() {
