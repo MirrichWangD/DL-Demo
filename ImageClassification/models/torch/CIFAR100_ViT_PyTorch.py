@@ -42,7 +42,7 @@ class VisionTransformer(object):
         Args:
             model: 传入 nn.Module 类型的架构
             criterion: 损失函数
-            optimizer: 优化器
+            optimizer: 优化器 
             **args: 将按照 xx=""来赋予类 attribute，目前更改有效的未 "cuda", "epochs", "save_epochs", "save_dir"
         """
         self.__dict__.update(self._default)

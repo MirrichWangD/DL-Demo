@@ -1,5 +1,6 @@
-from typing import Optional, Type, Union, List
+from typing import List, Optional, Type, Union
 
+import tensorflow as tf
 from tensorflow import keras
 
 
@@ -9,17 +10,17 @@ def conv3x3(planes: int, stride: int = 1, groups: int = 1, dilation: int = 1) ->
         planes,
         kernel_size=3,
         strides=stride,
-        padding="same",
+        padding='same',
         groups=groups,
         use_bias=False,
         dilation_rate=dilation,
-        kernel_initializer="he_normal",
+        kernel_initializer='he_normal',
     )
 
 
 def conv1x1(planes: int, stride: int = 1) -> keras.layers.Conv2D:
     """1x1 convolution"""
-    return keras.layers.Conv2D(planes, kernel_size=1, strides=stride, use_bias=False, kernel_initializer="he_normal")
+    return keras.layers.Conv2D(planes, kernel_size=1, strides=stride, use_bias=False, kernel_initializer='he_normal')
 
 
 class BasicBlock(keras.layers.Layer):
@@ -38,25 +39,25 @@ class BasicBlock(keras.layers.Layer):
     ) -> keras.layers.Layer:
         super().__init__()
         if zero_init_residual:
-            norm_gamma_initializer = "zeros"
+            norm_initializer = 'zeros'
         else:
-            norm_gamma_initializer = "ones"
+            norm_initializer = 'ones'
         if norm_layer is None:
             norm_layer = keras.layers.BatchNormalization
         if groups != 1 or base_width != 64:
-            raise ValueError("BasicBlock only supports groups=1 and base_width=64")
+            raise ValueError('BasicBlock only supports groups=1 and base_width=64')
         if dilation > 1:
-            raise NotImplementedError("Dilation > 1 not supported in BasicBlock")
+            raise NotImplementedError('Dilation > 1 not supported in BasicBlock')
         # Both self.conv1 and self.downsample layers downsample the input when stride != 1
         self.conv1 = conv3x3(planes, stride)
         self.bn1 = norm_layer()
         self.relu = keras.layers.ReLU()
         self.conv2 = conv3x3(planes)
-        self.bn2 = norm_layer(gamma_initializer=norm_gamma_initializer)
+        self.bn2 = norm_layer(gamma_initializer=norm_initializer)
         self.downsample = downsample
         self.stride = stride
 
-    def call(self, x):
+    def call(self, x) -> tf.Tensor:
         identity = x
 
         out = self.conv1(x)
@@ -97,9 +98,9 @@ class Bottleneck(keras.layers.Layer):
     ) -> keras.layers.Layer:
         super().__init__()
         if zero_init_residual:
-            norm_gamma_initializer = "zeros"
+            norm_initializer = 'zeros'
         else:
-            norm_gamma_initializer = "ones"
+            norm_initializer = 'ones'
 
         if norm_layer is None:
             norm_layer = keras.layers.BatchNormalization
@@ -110,12 +111,12 @@ class Bottleneck(keras.layers.Layer):
         self.conv2 = conv3x3(width, stride, groups, dilation)
         self.bn2 = norm_layer()
         self.conv3 = conv1x1(planes * self.expansion)
-        self.bn3 = norm_layer(gamma_initializer=norm_gamma_initializer)
+        self.bn3 = norm_layer(gamma_initializer=norm_initializer)
         self.relu = keras.layers.ReLU()
         self.downsample = downsample
         self.stride = stride
 
-    def call(self, x):
+    def call(self, x) -> tf.Tensor:
         identity = x
 
         out = self.conv1(x)
@@ -139,7 +140,6 @@ class Bottleneck(keras.layers.Layer):
 
 
 class ResNet(keras.Model):
-
     def __init__(
         self,
         block: Type[Union[BasicBlock, Bottleneck]],
@@ -169,18 +169,17 @@ class ResNet(keras.Model):
             replace_stride_with_dilation = [False, False, False]
         if len(replace_stride_with_dilation) != 3:
             raise ValueError(
-                "replace_stride_with_dilation should be None "
-                f"or a 3-element tuple, got {replace_stride_with_dilation}"
+                f'replace_stride_with_dilation should be None or a 3-element tuple, got {replace_stride_with_dilation}'
             )
         self.groups = groups
         self.base_width = width_per_group
 
         self.conv1 = keras.layers.Conv2D(
-            self.inplanes, kernel_size=7, strides=2, padding="same", use_bias=False, kernel_initializer="he_normal"
+            self.inplanes, kernel_size=7, strides=2, padding='same', use_bias=False, kernel_initializer='he_normal'
         )
         self.bn1 = norm_layer()
         self.relu = keras.layers.ReLU()
-        self.maxpool = keras.layers.MaxPool2D(pool_size=(3, 3), strides=2, padding="same")
+        self.maxpool = keras.layers.MaxPool2D(pool_size=(3, 3), strides=2, padding='same')
 
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
@@ -236,11 +235,11 @@ class ResNet(keras.Model):
 
         return keras.Sequential(layers)
 
-    def build(self, input_shape):
+    def build(self, input_shape) -> None:
         self.call(keras.Input(input_shape[1:]))
         super().build(input_shape)
 
-    def call(self, x):
+    def call(self, x) -> tf.Tensor:
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
@@ -257,31 +256,21 @@ class ResNet(keras.Model):
         return x
 
 
-def resnet18(**kwargs):
-    model = ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
-
-    return model
+def resnet18(**kwargs) -> keras.Model:
+    return ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
 
 
-def resnet34(**kwargs):
-    model = ResNet(BasicBlock, [3, 4, 6, 3], **kwargs)
-
-    return model
+def resnet34(**kwargs) -> keras.Model:
+    return ResNet(BasicBlock, [3, 4, 6, 3], **kwargs)
 
 
-def resnet50(**kwargs):
-    model = ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
-
-    return model
+def resnet50(**kwargs) -> keras.Model:
+    return ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
 
 
-def resnet101(**kwargs):
-    model = ResNet(Bottleneck, [3, 4, 23, 3], **kwargs)
-
-    return model
+def resnet101(**kwargs) -> keras.Model:
+    return ResNet(Bottleneck, [3, 4, 23, 3], **kwargs)
 
 
-def resnet152(**kwargs):
-    model = ResNet(Bottleneck, [3, 8, 36, 3], **kwargs)
-
-    return model
+def resnet152(**kwargs) -> keras.Model:
+    return ResNet(Bottleneck, [3, 8, 36, 3], **kwargs)

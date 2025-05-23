@@ -23,7 +23,7 @@ y_label_test_OneHot = tf.keras.utils.to_categorical(y_label_test)
 model = alexnet(num_classes=10)
 model.build(input_shape=(None, 224, 224, 3))
 model.summary(expand_nested=True)
-# criterion = tf.keras.losses.CategoricalCrossentropy(1from_logits=True)
+# criterion = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
 
 # epochs = 50
 # model.compile(loss=criterion, optimizer="adam", metrics=["accuracy"])
