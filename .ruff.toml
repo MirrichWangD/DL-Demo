@@ -1,0 +1,16 @@
+# 基本配置
+line-length = 120
+indent-width = 4
+target-version = "py38"
+
+# 格式化选项
+[format]
+indent-style = "space"
+quote-style = "single"  # 优先使用单引号
+docstring-code-format = true  # 格式化注释中的代码片段
+
+# Lint 规则
+[lint]
+select = ["F", "E", "W", "UP", "I"]  # 启用的规则类别
+ignore = ["E501", "UP031"]  # 忽略的规则
+fixable = ["ALL"]  # 允许自动修复所有规则
