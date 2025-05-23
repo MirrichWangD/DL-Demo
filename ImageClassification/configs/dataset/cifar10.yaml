@@ -1,0 +1,14 @@
+name: 'CIFAR-10'
+num_workers: 8
+
+num_classes: 10
+num_channels: 3
+image_size: (32, 32)
+
+preprocessing:
+  interpolation: 'bilinear'
+  resize: (256, 256)
+  crop: (224, 224)
+  normalize:
+    mean: (0.485, 0.456, 0.406)
+    std: (0.229, 0.224, 0.225)
