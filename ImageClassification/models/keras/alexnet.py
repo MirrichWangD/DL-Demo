@@ -2,7 +2,6 @@ from tensorflow import keras
 
 
 class AlexNet(keras.Model):
-
     def __init__(self, num_classes: int = 1000, dropout: float = 0.5):
         super().__init__()
         self.features = keras.Sequential(
@@ -24,7 +23,8 @@ class AlexNet(keras.Model):
             name="features",
         )
         self.avgpool = keras.layers.AveragePooling2D((6, 6))
-        self.classifier = keras.Sequential( 
+        self.classifier = keras.Sequential(
+            [
                 keras.layers.Flatten(),
                 keras.layers.Dropout(dropout),
                 keras.layers.Dense(4096),

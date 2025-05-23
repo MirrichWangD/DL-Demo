@@ -1,9 +1,9 @@
 import time
 
 import matplotlib.pyplot as plt
-import models
 import numpy as np
 import tensorflow as tf
+from models.keras import alexnet
 
 image_size = (224, 224)
 mean = (0.485, 0.456, 0.406)
@@ -20,7 +20,7 @@ X_img_test_normalize = X_img_test.astype("float32") / 255.0
 y_label_train_OneHot = tf.keras.utils.to_categorical(y_label_train)
 y_label_test_OneHot = tf.keras.utils.to_categorical(y_label_test)
 
-model = models.alexnet(num_classes=10)
+model = alexnet(num_classes=10)
 model.build(input_shape=(None, 224, 224, 3))
 model.summary(expand_nested=True)
 # criterion = tf.keras.losses.CategoricalCrossentropy(1from_logits=True)

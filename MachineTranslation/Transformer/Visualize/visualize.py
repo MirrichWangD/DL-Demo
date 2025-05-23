@@ -62,12 +62,12 @@ d_model = 512
 d_ff = 2048
 dropout = 0.1
 max_len = 5000
-resume = "../Tab-Separator/ckpt/en-zh/e6d6h8dm512df2048ml5000/best_model.pth"
+resume = "../Tab-Separator/ckpt/en-de/e6d6h8dm512df2048ml5000/best_model.pth"
 
 # 数据参数
-data_dir = "../Tab-Separator/data/eng-zh.txt"
-src_dict = "../Tab-Separator/ckpt/en-zh/e6d6h8dm512df2048ml5000/words/src_dict.txt"
-tgt_dict = "../Tab-Separator/ckpt/en-zh/e6d6h8dm512df2048ml5000/words/tgt_dict.txt"
+data_dir = "../Tab-Separator/data/eng-deu.txt"
+src_dict = "../Tab-Separator/ckpt/en-de/e6d6h8dm512df2048ml5000/words/src_dict.txt"
+tgt_dict = "../Tab-Separator/ckpt/en-de/e6d6h8dm512df2048ml5000/words/tgt_dict.txt"
 
 # cmap = sns.cubehelix_palette(start=1.5, rot=3, gamma=0.8, as_cmap=True)
 cmap = "RdBu_r"
@@ -293,74 +293,20 @@ class Transformer(nn.Module):
         return self.transformer.decoder(self.positional_encoding(self.tgt_tok_emb(tgt)), memory, tgt_mask)
 
 
-"""+++++++++++++++++++++++++++++++
-@@@ Scaled Dot-product Attention
-节选自 torch.nn.functional 4816行
-+++++++++++++++++++++++++++++++"""
-
-
-def scaled_dot_product_attention(
-    q: torch.Tensor,
-    k: torch.Tensor,
-    v: torch.Tensor,
-    attn_mask: Optional[torch.Tensor] = None,
-    dropout_p: float = 0.0,
-) -> Tuple[torch.Tensor, torch.Tensor]:
-    """
-    Computes scaled dot product attention on query, key and value tensors, using
-    an optional attention mask if passed, and applying dropout if a probability
-    greater than 0.0 is specified.
-    Returns a tensor pair containing attended values and attention weights.
-
-    Args:
-        q, k, v: query, key and value tensors. See Shape section for shape details.
-        attn_mask: optional tensor containing mask values to be added to calculated
-            attention. May be 2D or 3D; see Shape section for details.
-        dropout_p: dropout probability. If greater than 0.0, dropout is applied.
-
-    Shape:
-        - q: :math:`(B, Nt, E)` where B is batch size, Nt is the target sequence length,
-            and E is embedding dimension.
-        - key: :math:`(B, Ns, E)` where B is batch size, Ns is the source sequence length,
-            and E is embedding dimension.
-        - value: :math:`(B, Ns, E)` where B is batch size, Ns is the source sequence length,
-            and E is embedding dimension.
-        - attn_mask: either a 3D tensor of shape :math:`(B, Nt, Ns)` or a 2D tensor of
-            shape :math:`(Nt, Ns)`.
-
-        - Output: attention values have shape :math:`(B, Nt, E)`; attention weights
-            have shape :math:`(B, Nt, Ns)`
-    """
-    B, Nt, E = q.shape
-    q = q / math.sqrt(E)
-    # (B, Nt, E) x (B, E, Ns) -> (B, Nt, Ns)
-    if attn_mask is not None:
-        attn = torch.baddbmm(attn_mask, q, k.transpose(-2, -1))
-    else:
-        attn = torch.bmm(q, k.transpose(-2, -1))
-
-    attn = F.softmax(attn, dim=-1)
-    if dropout_p > 0.0:
-        attn = F.dropout(attn, p=dropout_p)
-    # (B, Nt, Ns) x (B, Ns, E) -> (B, Nt, E)
-    output = torch.bmm(attn, v)
-    return output, attn
-
-
 """++++++++++++++++++++++++
 @@@ Load Data & init model
 ++++++++++++++++++++++++"""
 
 # 读取分词器
 src_tokenizer = get_tokenizer("spacy", language="en_core_web_sm")
-tgt_tokenizer = get_tokenizer("spacy", language="zh_core_web_sm")
+tgt_tokenizer = get_tokenizer("spacy", language="de_core_news_sm")
 # 读取 source 词典
 with open(src_dict, encoding="utf-8") as f:
     src_words = list(map(lambda i: i.strip(), f.readlines()))
 src_vocab = vocab(OrderedDict(zip(src_words, [10] * len(src_words))))
 # 读取 target 词典
 with open(tgt_dict, encoding="utf-8") as f:
-    tgt_words = list(map(lambda i: i.strip(), f.readlines()))
+    tgt_words = list(map(lambda i: i.rstrip(), f.readlines()))
 tgt_vocab = vocab(OrderedDict(zip(tgt_words, [10] * len(tgt_words))))
 
 # 读取数据文件
@@ -370,8 +316,8 @@ data_idx = [29365, 29366, 29367, 29368, 29369]
 # 将句子进行分词，转换成 Tensor
 data = []
 for idx in data_idx:
-    src_word = src_tokenizer(re.sub(r"\s+", " ", texts.iloc[idx][0]))
-    tgt_word = tgt_tokenizer(re.sub(r"\s+", " ", texts.iloc[idx][1]))
+    src_word = src_tokenizer(texts.iloc[idx][0])
+    tgt_word = tgt_tokenizer(texts.iloc[idx][1])
     src_token = torch.tensor([BOS_IDX] + src_vocab.lookup_indices(src_word) + [EOS_IDX])
     tgt_token = torch.tensor([BOS_IDX] + tgt_vocab.lookup_indices(tgt_word) + [EOS_IDX])
     data.append((src_token, tgt_token))
@@ -471,8 +417,9 @@ tgt_emb = model.tgt_tok_emb(tgt_input)
 
 fig_src_emb, ax_src_emb = heatmap(
     [src_emb.cpu().detach()[:, 0, :64]],
+    x_ticks=[True],
     y_ticks=[sentences[0][0]],
-    fig_size=(36, 10),
+    fig_size=(36, 6),
     cbar=True,
     annot=True,
     fmt=".2f",

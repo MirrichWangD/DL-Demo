@@ -80,22 +80,21 @@ def get_args_parser():
     parser.add_argument("--seed", default=666, type=int)
 
     # 数据集参数
-    parser.add_argument("--data_dir", default="./data/eng-zh.txt", type=str, help="表格间隔符的txt数据文件地址")
-    parser.add_argument("--src_lang", default="en", type=str, help="输入语言，如en：英语")
-    parser.add_argument("--tgt_lang", default="zh", type=str, help="输出语言，如zh：简中")
-    parser.add_argument("--src_dict", default=None, type=str, help="输入语言词典txt文件")
-    parser.add_argument("--tgt_dict", default=None, type=str, help="输出语言词典txt文件")
-    parser.add_argument("--max_len", default=256, type=int, help="句子向量最大长度")
-    parser.add_argument("--min_freq", default=1, type=str, help="词频最少数量，小于该数将不会加载进词汇中")
-    parser.add_argument("--val_size", default=1000, type=int, help="验证数据量")
-    parser.add_argument("--test_size", default=100, type=int, help="测试数据量")
+    parser.add_argument("--data-dir", default="./data/eng-zh.txt", type=str, help="表格间隔符的txt数据文件地址")
+    parser.add_argument("--src-lang", default="en", type=str, help="输入语言，如en：英语")
+    parser.add_argument("--tgt-lang", default="zh", type=str, help="输出语言，如zh：简中")
+    parser.add_argument("--src-dict", default=None, type=str, help="输入语言词典txt文件")
+    parser.add_argument("--tgt-dict", default=None, type=str, help="输出语言词典txt文件")
+    parser.add_argument("--max-len", default=4000, type=int, help="句子向量最大长度")
+    parser.add_argument("--min-freq", default=1, type=str, help="词频最少数量，小于该数将不会加载进词汇中")
+    parser.add_argument("--train-rate", default=0.9, type=float, help="训练数据量比例")
 
-    # 模型部分参数
-    parser.add_argument("--n_enc_layers", default=6, type=int, help="Encoder编码器层数")
-    parser.add_argument("--n_dec_layers", default=6, type=int, help="Decoder解码器层数")
-    parser.add_argument("--n_heads", default=8, type=int, help="多头注意力头的数量")
-    parser.add_argument("--d_model", default=512, type=int, help="Embedding嵌入层维数")
-    parser.add_argument("--d_ff", default=2048, type=int, help="FFN维数")
+    # 模型参数
+    parser.add_argument("--n-enc-layers", default=6, type=int, help="Encoder编码器层数")
+    parser.add_argument("--n-dec-layers", default=6, type=int, help="Decoder解码器层数")
+    parser.add_argument("--n-heads", default=8, type=int, help="多头注意力头的数量")
+    parser.add_argument("--d-model", default=512, type=int, help="Embedding嵌入层维数")
+    parser.add_argument("--d-ff", default=2048, type=int, help="FFN维数")
     parser.add_argument("--dropout", default=0.1, type=float, help="LN层Dropout比例")
     parser.add_argument("--resume", default=None, type=str, help="导入模型权重路径")
 
@@ -103,8 +102,8 @@ def get_args_parser():
     parser.add_argument("--mode", default="train", choices=["train", "eval"], help="脚本模式，train：训练；eval：验证")
     parser.add_argument("--epochs", default=100, type=int, help="训练轮数")
     parser.add_argument("--lr", default=0.0001, type=float, help="学习率")
-    parser.add_argument("--batch_size", default=32, type=int, help="批数量")
-    parser.add_argument("--n_workers", default=0, type=int, help="读取数据进程数，使用交互式窗口运行时请设置为0")
+    parser.add_argument("--batch-size", default=64, type=int, help="批数量")
+    parser.add_argument("--n-workers", default=0, type=int, help="读取数据进程数，使用交互式窗口运行时请设置为0")
     parser.add_argument("--device", default="cuda:0", type=str, help="运算设备")
     parser.add_argument("--output", default=None, type=str, help="训练结果保存路径")
 
@@ -421,12 +420,10 @@ def main(args):
     args.device = torch.device(args.device) if torch.cuda.is_available() else torch.device("cpu")
     # 获取输出目录
     if args.output is None:
-        output_dir = Path(f"output/{args.src_lang}-{args.tgt_lang}/{time.strftime('%Y%m%d_%H%M%S', time.localtime())}")
+        output_dir = Path(f"output/{args.src_lang}-{args.tgt_lang}_{time.strftime('%Y%m%d-%H%M%S', time.localtime())}")
     else:
         output_dir = Path(args.output)
     output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "metrics").mkdir(parents=True, exist_ok=True)
-    (output_dir / "words").mkdir(parents=True, exist_ok=True)
 
     # ------------------------ #
     # Load Data
@@ -446,9 +443,14 @@ def main(args):
     # 划分训练、验证、测试集，分批
     indices = np.arange(len(dataset))
     np.random.shuffle(indices)
-    train_sampler = BatchSampler(indices[:-(args.val_size + args.test_size)], args.batch_size, False)
-    val_sampler = BatchSampler(indices[-(args.val_size + args.test_size):-args.test_size], args.batch_size, False)
-    test_sampler = BatchSampler(indices[-args.test_size:], batch_size=1, drop_last=False)
+    train_size = math.floor(dataset.length * args.train_rate)
+    val_size = math.floor((dataset.length - train_size) / 2)
+    test_size = dataset.length - train_size - val_size
+    print("train:", train_size, "val:", val_size, "test:", test_size)
+
+    train_sampler = BatchSampler(indices[:-(val_size + test_size)], args.batch_size, False)
+    val_sampler = BatchSampler(indices[-(val_size + test_size):-test_size], args.batch_size, False)
+    test_sampler = BatchSampler(indices[-test_size:], batch_size=1, drop_last=False)
 
     # 生成数据迭代器
     train_db = DataLoader(dataset, batch_sampler=train_sampler, num_workers=args.n_workers, collate_fn=collate_fn)
@@ -476,9 +478,9 @@ def main(args):
     if args.mode == "train":
         print("Start training...")
         # 保存 vocab
-        with open(output_dir / "words/src_dict.txt", "w+", encoding="utf-8") as f:
+        with open(output_dir / "src_dict.txt", "w+", encoding="utf-8") as f:
             f.writelines(map(lambda i: i + "\n", dataset.src_vocab.get_itos()))
-        with open(output_dir / "words/tgt_dict.txt", "w+", encoding="utf-8") as f:
+        with open(output_dir / "tgt_dict.txt", "w+", encoding="utf-8") as f:
             f.writelines(map(lambda i: i + "\n", dataset.tgt_vocab.get_itos()))
         # 记录每个 step 的损失和BLEU分数
         train_history = {
@@ -624,8 +626,8 @@ def main(args):
         )
         print("模型权重保存到：%s" % output_dir)
         # 保存损失、准确率
-        print("训练、验证损失和准确率保存到：%s" % (output_dir / "metrics/train_history.json"))
-        with open(output_dir / "metrics/train_history.json", "w", encoding="utf-8") as f:
+        print("训练、验证损失和准确率保存到：%s" % (output_dir / "train.json"))
+        with open(output_dir / "train.json", "w", encoding="utf-8") as f:
             json.dump(train_history, f)
 
         # ------------------------ #
@@ -640,7 +642,7 @@ def main(args):
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
         plt.tight_layout()
-        plt.savefig(output_dir / "metrics/loss.png")
+        plt.savefig(output_dir / "loss.png")
         # 绘制精准率图
         plt.figure()
         plt.plot(np.mean(train_history["bleu"]["train"], 1), label="Train")
@@ -649,7 +651,7 @@ def main(args):
         plt.xlabel("Epoch")
         plt.ylabel("Bleu")
         plt.tight_layout()
-        plt.savefig(output_dir / "metrics/bleu.png")
+        plt.savefig(output_dir / "bleu.png")
 
     # ------------------------ #
     # Evaluating Model
